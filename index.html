@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traverse — TryHackMe Walkthrough</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #0f1318;
+    --card: #13181f;
+    --border: #1e2730;
+    --green: #00ff88;
+    --green-dim: #00cc6a;
+    --cyan: #00e5ff;
+    --red: #ff4560;
+    --yellow: #ffd166;
+    --text: #c9d1d9;
+    --muted: #58677a;
+    --white: #e8edf2;
+    --mono: 'Share Tech Mono', monospace;
+    --display: 'Bebas Neue', sans-serif;
+    --body: 'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ── SCAN LINES OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,255,136,0.015) 2px,
+      rgba(0,255,136,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4rem 2rem 3rem;
+    overflow: hidden;
+  }
+
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    animation: gridPulse 8s ease-in-out infinite;
+  }
+
+  @keyframes gridPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  .hero-glow {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);
+    top: -150px;
+    right: -100px;
+    animation: glowPulse 6s ease-in-out infinite;
+  }
+
+  @keyframes glowPulse {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.15); opacity: 1; }
+  }
+
+  .hero-content { position: relative; z-index: 2; max-width: 900px; margin: 0 auto; width: 100%; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(0,255,136,0.08);
+    border: 1px solid rgba(0,255,136,0.3);
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
+    margin-bottom: 1.5rem;
+    animation: fadeDown 0.6s ease both;
+  }
+
+  .badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: blink 1.2s step-start infinite;
+  }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  .hero-title {
+    font-family: var(--display);
+    font-size: clamp(5rem, 14vw, 11rem);
+    line-height: 0.9;
+    letter-spacing: 0.02em;
+    color: var(--white);
+    animation: fadeDown 0.7s 0.1s ease both;
+  }
+
+  .hero-title span {
+    display: block;
+    -webkit-text-stroke: 1px var(--green);
+    color: transparent;
+  }
+
+  .hero-subtitle {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--cyan);
+    margin-top: 1.5rem;
+    letter-spacing: 0.08em;
+    animation: fadeDown 0.7s 0.2s ease both;
+  }
+
+  .hero-meta {
+    display: flex;
+    gap: 2rem;
+    margin-top: 2.5rem;
+    flex-wrap: wrap;
+    animation: fadeDown 0.7s 0.3s ease both;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .meta-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .meta-value {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--green);
+  }
+
+  .scroll-hint {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    animation: bounce 2s ease-in-out infinite;
+  }
+
+  .scroll-hint::after {
+    content: '↓';
+    font-size: 1rem;
+    color: var(--green);
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(6px); }
+  }
+
+  /* ── MAIN CONTENT ── */
+  .main { max-width: 900px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+
+  /* ── SECTION HEADERS ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    margin-top: 4rem;
+  }
+
+  .section-number {
+    font-family: var(--display);
+    font-size: 5rem;
+    line-height: 1;
+    -webkit-text-stroke: 1px var(--border);
+    color: transparent;
+  }
+
+  .section-info { flex: 1; }
+
+  .section-tag {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--green);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+  }
+
+  .section-title {
+    font-family: var(--display);
+    font-size: 2.2rem;
+    letter-spacing: 0.04em;
+    color: var(--white);
+  }
+
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--green-dim), transparent);
+  }
+
+  /* ── STEP CARDS ── */
+  .step-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    border-radius: 2px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+    transition: border-color 0.2s, transform 0.2s;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .step-card:hover {
+    border-color: var(--green);
+    transform: translateX(4px);
+  }
+
+  .step-card:nth-child(2) { animation-delay: 0.05s; }
+  .step-card:nth-child(3) { animation-delay: 0.10s; }
+  .step-card:nth-child(4) { animation-delay: 0.15s; }
+  .step-card:nth-child(5) { animation-delay: 0.20s; }
+
+  .step-number {
+    position: absolute;
+    top: -1px;
+    right: 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--bg);
+    background: var(--green);
+    padding: 0.15rem 0.6rem;
+    letter-spacing: 0.1em;
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+  }
+
+  .step-icon {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--green);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    background: rgba(0,255,136,0.05);
+    flex-shrink: 0;
+  }
+
+  .step-title {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    color: var(--white);
+    letter-spacing: 0.05em;
+  }
+
+  .step-body { font-size: 0.95rem; line-height: 1.75; color: var(--text); }
+  .step-body p { margin-bottom: 0.8rem; }
+  .step-body p:last-child { margin-bottom: 0; }
+
+  /* ── CODE BLOCKS ── */
+  .code-block {
+    background: #080b0f;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    border-radius: 2px;
+    padding: 1.25rem 1.5rem;
+    margin: 1rem 0;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  .code-block::before {
+    content: attr(data-label);
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--muted);
+    background: var(--border);
+    padding: 0.2rem 0.6rem;
+    letter-spacing: 0.1em;
+  }
+
+  .code-block code {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--cyan);
+    display: block;
+    white-space: pre;
+  }
+
+  .code-block code .comment { color: var(--muted); }
+  .code-block code .keyword { color: var(--yellow); }
+  .code-block code .value { color: var(--green); }
+  .code-block code .path { color: #ff9f43; }
+
+  /* ── INLINE CODE ── */
+  code:not(.block) {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: rgba(0,229,255,0.08);
+    color: var(--cyan);
+    padding: 0.1em 0.4em;
+    border-radius: 2px;
+    border: 1px solid rgba(0,229,255,0.15);
+  }
+
+  /* ── FLAG CARD ── */
+  .flag-card {
+    background: linear-gradient(135deg, rgba(0,255,136,0.06), rgba(0,229,255,0.04));
+    border: 1px solid rgba(0,255,136,0.4);
+    border-radius: 2px;
+    padding: 1.5rem 2rem;
+    margin: 1.2rem 0;
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .flag-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(0,255,136,0.03), transparent);
+    animation: shimmer 3s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  .flag-icon { font-size: 1.8rem; flex-shrink: 0; }
+
+  .flag-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+
+  .flag-value {
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--green);
+    letter-spacing: 0.05em;
+    word-break: break-all;
+  }
+
+  /* ── SCREENSHOT PLACEHOLDER ── */
+  .screenshot {
+    background: var(--surface);
+    border: 1px dashed var(--muted);
+    border-radius: 2px;
+    padding: 3rem 2rem;
+    margin: 1.2rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .screenshot:hover {
+    border-color: var(--green);
+    background: rgba(0,255,136,0.03);
+  }
+
+  .screenshot-icon { font-size: 2rem; opacity: 0.4; }
+
+  .screenshot-label {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  .screenshot-hint {
+    font-size: 0.75rem;
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
+  /* ── HIGHLIGHT TEXT ── */
+  .hl-green { color: var(--green); font-weight: 500; }
+  .hl-cyan { color: var(--cyan); }
+  .hl-yellow { color: var(--yellow); }
+  .hl-red { color: var(--red); }
+
+  /* ── TECHNIQUE TAGS ── */
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    padding: 0.25rem 0.7rem;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
+  }
+
+  .tag-green { background: rgba(0,255,136,0.1); color: var(--green); border: 1px solid rgba(0,255,136,0.2); }
+  .tag-cyan { background: rgba(0,229,255,0.1); color: var(--cyan); border: 1px solid rgba(0,229,255,0.2); }
+  .tag-yellow { background: rgba(255,209,102,0.1); color: var(--yellow); border: 1px solid rgba(255,209,102,0.2); }
+  .tag-red { background: rgba(255,69,96,0.1); color: var(--red); border: 1px solid rgba(255,69,96,0.2); }
+
+  /* ── SUMMARY TABLE ── */
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    margin-top: 1.5rem;
+  }
+
+  .summary-table th {
+    background: rgba(0,255,136,0.08);
+    color: var(--green);
+    padding: 0.7rem 1rem;
+    text-align: left;
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid var(--border);
+    font-weight: normal;
+  }
+
+  .summary-table td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+  }
+
+  .summary-table tr:last-child td { border-bottom: none; }
+  .summary-table tr:hover td { background: rgba(0,255,136,0.03); }
+
+  /* ── FOOTER ── */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 2rem;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  .footer span { color: var(--green); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── DIVIDER ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 3rem 0;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .hero-meta { gap: 1.2rem; }
+    .section-number { font-size: 3.5rem; }
+    .section-title { font-size: 1.7rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HERO ── -->
+<header class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-content">
+    <div class="badge">TryHackMe — Room Walkthrough</div>
+    <h1 class="hero-title">
+      Traverse
+      <span>Room</span>
+    </h1>
+    <p class="hero-subtitle">// Web Enumeration · Source Analysis · IDOR · Privilege Escalation</p>
+    <div class="hero-meta">
+      <div class="meta-item">
+        <span class="meta-label">Platform</span>
+        <span class="meta-value">TryHackMe</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Category</span>
+        <span class="meta-value">Web / CTF</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Flags Captured</span>
+        <span class="meta-value">02 / 02</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Status</span>
+        <span class="meta-value">✓ Completed</span>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-hint">SCROLL</div>
+</header>
+
+<!-- ── MAIN ── -->
+<main class="main">
+
+  <!-- OVERVIEW -->
+  <div class="section-header">
+    <div class="section-number">00</div>
+    <div class="section-info">
+      <div class="section-tag">// Overview</div>
+      <div class="section-title">Attack Summary</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th>Phase</th>
+        <th>Technique</th>
+        <th>Finding</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Recon</td>
+        <td>View Source / JS Analysis</td>
+        <td>Hex-encoded flag in custom.min.js</td>
+      </tr>
+      <tr>
+        <td>Enumeration</td>
+        <td>Directory Listing</td>
+        <td>/logs → email_dump.txt with credentials</td>
+      </tr>
+      <tr>
+        <td>IDOR</td>
+        <td>Parameter Tampering</td>
+        <td>Customer data via id parameter</td>
+      </tr>
+      <tr>
+        <td>Privilege Escalation</td>
+        <td>DOM Manipulation</td>
+        <td>Admin RCE via injected command</td>
+      </tr>
+      <tr>
+        <td>Post-Exploitation</td>
+        <td>File Enumeration</td>
+        <td>Final flag via renamed_file_manager.php</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="divider"></div>
+
+  <!-- STEP 1 -->
+  <div class="section-header">
+    <div class="section-number">01</div>
+    <div class="section-info">
+      <div class="section-tag">// Recon</div>
+      <div class="section-title">Source Analysis & Flag 1</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 01</div>
+    <div class="step-header">
+      <div class="step-icon">🔍</div>
+      <div class="step-title">VIEW SOURCE → JavaScript Enumeration</div>
+    </div>
+    <div class="step-body">
+      <p>Starting with a basic <span class="hl-green">View Page Source</span> on the target webpage revealed two JavaScript files being loaded:</p>
+
+      <div class="code-block" data-label="HTML SOURCE">
+        <code><span class="comment"><!-- Discovered JS references --></span>
+<span class="keyword">tailwind</span>.min.js
+<span class="value">custom</span>.min.js   <span class="comment">← suspicious</span></code>
+      </div>
+
+      <p>Opening <code>custom.min.js</code> directly in the browser revealed what appeared to be an encoded string. The encoding pattern was consistent with <span class="hl-yellow">hexadecimal encoding</span>.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-green">View Source</span>
+      <span class="tag tag-cyan">JS Enumeration</span>
+      <span class="tag tag-yellow">Hex Encoding</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 02</div>
+    <div class="step-header">
+      <div class="step-icon">🧪</div>
+      <div class="step-title">CyberChef Decoding</div>
+    </div>
+    <div class="step-body">
+      <p>The encoded string from <code>custom.min.js</code> was pasted into <span class="hl-green">CyberChef</span> and the <em>From Hex</em> recipe was applied, successfully decoding the value to reveal the first flag.</p>
+
+      <div class="screenshot">
+        <div class="screenshot-icon">📸</div>
+        <div class="screenshot-label">[ SCREENSHOT — CyberChef hex decode output ]</div>
+        <div class="screenshot-hint">Add screenshot of CyberChef decoding the flag</div>
+      </div>
+
+      <div class="flag-card">
+        <div class="flag-icon">🚩</div>
+        <div>
+          <div class="flag-label">Flag 1 Captured</div>
+          <div class="flag-value">THM{directory_listing_is_the_way}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-green">CyberChef</span>
+      <span class="tag tag-yellow">From Hex</span>
+      <span class="tag tag-green">Flag Captured</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- STEP 2 -->
+  <div class="section-header">
+    <div class="section-number">02</div>
+    <div class="section-info">
+      <div class="section-tag">// Enumeration</div>
+      <div class="section-title">Directory Listing & Credential Discovery</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 03</div>
+    <div class="step-header">
+      <div class="step-icon">📂</div>
+      <div class="step-title">Exposed /logs Directory</div>
+    </div>
+    <div class="step-body">
+      <p>Returning to the page source revealed a reference to a <code>/logs</code> directory. Navigating directly to it confirmed directory listing was enabled — a misconfiguration that exposed server files.</p>
+
+      <div class="code-block" data-label="URL">
+        <code><span class="path">http://&lt;target-ip&gt;</span>/logs/
+<span class="comment">↳ Directory listing exposed: email_dump.txt</span></code>
+      </div>
+
+      <div class="screenshot">
+        <div class="screenshot-icon">📸</div>
+        <div class="screenshot-label">[ SCREENSHOT — /logs directory listing ]</div>
+        <div class="screenshot-hint">Add screenshot of the directory index page</div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">Directory Listing</span>
+      <span class="tag tag-cyan">Misconfiguration</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 04</div>
+    <div class="step-header">
+      <div class="step-icon">📧</div>
+      <div class="step-title">Email Dump Analysis</div>
+    </div>
+    <div class="step-body">
+      <p>The file <code>email_dump.txt</code> contained an email exchange between <span class="hl-green">Bob</span> and <span class="hl-green">Mark</span>. Key intelligence extracted:</p>
+      <p>• A hidden directory named after the <span class="hl-yellow">first phase of the SSDLC</span> — <strong>Planning</strong> — was referenced as a location for the <em>customer API</em>.</p>
+      <p>• The email also contained the <span class="hl-red">password</span> required to access this directory.</p>
+
+      <div class="screenshot">
+        <div class="screenshot-icon">📸</div>
+        <div class="screenshot-label">[ SCREENSHOT — email_dump.txt contents ]</div>
+        <div class="screenshot-hint">Add screenshot of the email dump text file</div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">OSINT</span>
+      <span class="tag tag-red">Credential Exposure</span>
+      <span class="tag tag-cyan">SSDLC Reference</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- STEP 3 -->
+  <div class="section-header">
+    <div class="section-number">03</div>
+    <div class="section-info">
+      <div class="section-tag">// IDOR</div>
+      <div class="section-title">Insecure Direct Object Reference</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 05</div>
+    <div class="step-header">
+      <div class="step-icon">🔑</div>
+      <div class="step-title">Accessing the /planning Directory</div>
+    </div>
+    <div class="step-body">
+      <p>Navigating to the <code>/planning</code> directory and submitting the discovered password granted access. The page documented how to retrieve customer data from the API — using an <span class="hl-yellow">id parameter</span>.</p>
+
+      <div class="code-block" data-label="URL">
+        <code><span class="path">http://&lt;target-ip&gt;</span>/planning/
+<span class="comment">Password: &lt;from email_dump.txt&gt;</span></code>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-green">Auth Bypass</span>
+      <span class="tag tag-cyan">API Discovery</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 06</div>
+    <div class="step-header">
+      <div class="step-icon">🔢</div>
+      <div class="step-title">ID Parameter Enumeration</div>
+    </div>
+    <div class="step-body">
+      <p>By incrementing the <code>id</code> parameter starting at <code>id=1</code>, each request returned a different customer record. There was <span class="hl-red">no access control</span> validating which users could view which records — a classic <span class="hl-green">IDOR vulnerability</span>.</p>
+
+      <div class="code-block" data-label="IDOR ENUMERATION">
+        <code><span class="path">http://&lt;target-ip&gt;</span>/planning/api?<span class="keyword">id</span>=<span class="value">1</span>  <span class="comment">← start here</span>
+<span class="path">http://&lt;target-ip&gt;</span>/planning/api?<span class="keyword">id</span>=<span class="value">2</span>
+<span class="path">http://&lt;target-ip&gt;</span>/planning/api?<span class="keyword">id</span>=<span class="value">3</span>  <span class="comment">← admin account + /realadmin dir</span>
+<span class="path">http://&lt;target-ip&gt;</span>/planning/api?<span class="keyword">id</span>=<span class="value">4</span>
+<span class="path">http://&lt;target-ip&gt;</span>/planning/api?<span class="keyword">id</span>=<span class="value">5</span>  <span class="comment">← target email found</span></code>
+      </div>
+
+      <p>Key findings from enumeration:</p>
+      <p>• <code>id=3</code> — Identified as the <span class="hl-red">admin account</span>, leaked a <code>/realadmin</code> directory path along with credentials.</p>
+      <p>• <code>id=5</code> — Revealed the target email: <span class="hl-green"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="aec4c1c6c0eedadccfd8cbdcddcb80cdc1c3">[email&#160;protected]</a></span></p>
+
+      <div class="screenshot">
+        <div class="screenshot-icon">📸</div>
+        <div class="screenshot-label">[ SCREENSHOT — API response at id=3 and id=5 ]</div>
+        <div class="screenshot-hint">Add screenshots showing admin and john's records</div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">IDOR</span>
+      <span class="tag tag-yellow">Parameter Tampering</span>
+      <span class="tag tag-red">Broken Access Control</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- STEP 4 -->
+  <div class="section-header">
+    <div class="section-number">04</div>
+    <div class="section-info">
+      <div class="section-tag">// Privilege Escalation</div>
+      <div class="section-title">Admin RCE via DOM Manipulation</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 07</div>
+    <div class="step-header">
+      <div class="step-icon">⚙️</div>
+      <div class="step-title">Admin Panel — Command Execution</div>
+    </div>
+    <div class="step-body">
+      <p>Navigating to <code>/realadmin</code> presented a login page. Using the credentials leaked from the API at <code>id=3</code> granted access to an admin management panel.</p>
+      <p>The panel exposed a <span class="hl-cyan">command execution dropdown</span> containing two options. Opening <span class="hl-green">DevTools → Elements tab</span> revealed the underlying option values:</p>
+
+      <div class="code-block" data-label="HTML — DROPDOWN OPTIONS">
+        <code><span class="keyword">&lt;option</span> value=<span class="value">"whoami"</span>&gt;whoami&lt;/option&gt;
+<span class="keyword">&lt;option</span> value=<span class="value">"pwd"</span>&gt;pwd&lt;/option&gt;</code>
+      </div>
+
+      <p>By right-clicking the dropdown and selecting <em>Edit as HTML</em> in DevTools, a third option was injected:</p>
+
+      <div class="code-block" data-label="DOM INJECTION">
+        <code><span class="keyword">&lt;option</span> value=<span class="value">"ls -la"</span>&gt;ls -la&lt;/option&gt;
+<span class="comment">↳ Injected directly into the DOM — no server-side validation</span></code>
+      </div>
+
+      <div class="screenshot">
+        <div class="screenshot-icon">📸</div>
+        <div class="screenshot-label">[ SCREENSHOT — DevTools DOM injection ]</div>
+        <div class="screenshot-hint">Add screenshot showing the Edit as HTML and new option</div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">Remote Code Execution</span>
+      <span class="tag tag-yellow">DOM Manipulation</span>
+      <span class="tag tag-cyan">DevTools</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 08</div>
+    <div class="step-header">
+      <div class="step-icon">📋</div>
+      <div class="step-title">File Enumeration via ls -la</div>
+    </div>
+    <div class="step-body">
+      <p>Executing the injected <code>ls -la</code> command returned a directory listing from the server. Two significant files were revealed:</p>
+
+      <div class="code-block" data-label="SERVER RESPONSE">
+        <code><span class="comment">drwxr-xr-x  realadmin/</span>
+-rw-r--r--  <span class="value">thm_shell.php</span>          <span class="comment">← reverse shell</span>
+-rw-r--r--  <span class="value">rename_file_manager.php</span>  <span class="comment">← final flag location</span></code>
+      </div>
+
+      <div class="screenshot">
+        <div class="screenshot-icon">📸</div>
+        <div class="screenshot-label">[ SCREENSHOT — ls -la output in admin panel ]</div>
+        <div class="screenshot-hint">Add screenshot of the command output listing both files</div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">File Disclosure</span>
+      <span class="tag tag-yellow">RCE Output</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- STEP 5 -->
+  <div class="section-header">
+    <div class="section-number">05</div>
+    <div class="section-info">
+      <div class="section-tag">// Post-Exploitation</div>
+      <div class="section-title">Final Flag</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 09</div>
+    <div class="step-header">
+      <div class="step-icon">🏁</div>
+      <div class="step-title">rename_file_manager.php → Flag 2</div>
+    </div>
+    <div class="step-body">
+      <p>Navigating directly to the discovered file at the path below completed the room:</p>
+
+      <div class="code-block" data-label="URL">
+        <code><span class="path">http://&lt;target-ip&gt;</span>/realadmin/<span class="value">rename_file_manager.php</span></code>
+      </div>
+
+      <p>The page rendered the final flag directly in the browser.</p>
+
+      <div class="screenshot">
+        <div class="screenshot-icon">📸</div>
+        <div class="screenshot-label">[ SCREENSHOT — rename_file_manager.php final flag ]</div>
+        <div class="screenshot-hint">Add screenshot of the final flag page</div>
+      </div>
+
+      <div class="flag-card">
+        <div class="flag-icon">🚩</div>
+        <div>
+          <div class="flag-label">Flag 2 Captured</div>
+          <div class="flag-value">thm{website_restored}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-green">Flag Captured</span>
+      <span class="tag tag-green">Room Complete</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- KEY LEARNINGS -->
+  <div class="section-header">
+    <div class="section-number">06</div>
+    <div class="section-info">
+      <div class="section-tag">// Reflection</div>
+      <div class="section-title">Key Takeaways</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">🧠</div>
+      <div class="step-title">Vulnerabilities Identified</div>
+    </div>
+    <div class="step-body">
+      <p><span class="hl-green">Sensitive data in client-side JS</span> — Secrets should never be embedded in JavaScript files served to the browser, even if obfuscated or encoded.</p>
+      <p><span class="hl-yellow">Directory listing enabled</span> — Web servers should be configured to deny directory browsing to prevent file enumeration.</p>
+      <p><span class="hl-red">Insecure Direct Object Reference (IDOR)</span> — API endpoints must validate that the authenticated user is authorised to access the requested resource, not just that they are logged in.</p>
+      <p><span class="hl-cyan">Client-side only access controls</span> — Command execution gated only by a UI dropdown with no server-side validation is trivially bypassed via DOM manipulation.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">OWASP A01 — Broken Access Control</span>
+      <span class="tag tag-yellow">OWASP A02 — Cryptographic Failure</span>
+      <span class="tag tag-cyan">OWASP A05 — Security Misconfiguration</span>
+    </div>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <
