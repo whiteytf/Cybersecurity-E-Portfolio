@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traverse — TryHackMe Walkthrough</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #0f1318;
+    --card: #13181f;
+    --border: #1e2730;
+    --green: #00ff88;
+    --green-dim: #00cc6a;
+    --cyan: #00e5ff;
+    --red: #ff4560;
+    --yellow: #ffd166;
+    --text: #c9d1d9;
+    --muted: #58677a;
+    --white: #e8edf2;
+    --mono: 'Share Tech Mono', monospace;
+    --display: 'Bebas Neue', sans-serif;
+    --body: 'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ── SCAN LINES OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,255,136,0.015) 2px,
+      rgba(0,255,136,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4rem 2rem 3rem;
+    overflow: hidden;
+  }
+
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    animation: gridPulse 8s ease-in-out infinite;
+  }
+
+  @keyframes gridPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  .hero-glow {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);
+    top: -150px;
+    right: -100px;
+    animation: glowPulse 6s ease-in-out infinite;
+  }
+
+  @keyframes glowPulse {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.15); opacity: 1; }
+  }
+
+  .hero-content { position: relative; z-index: 2; max-width: 900px; margin: 0 auto; width: 100%; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(0,255,136,0.08);
+    border: 1px solid rgba(0,255,136,0.3);
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
+    margin-bottom: 1.5rem;
+    animation: fadeDown 0.6s ease both;
+  }
+
+  .badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: blink 1.2s step-start infinite;
+  }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  .hero-title {
+    font-family: var(--display);
+    font-size: clamp(5rem, 14vw, 11rem);
+    line-height: 0.9;
+    letter-spacing: 0.02em;
+    color: var(--white);
+    animation: fadeDown 0.7s 0.1s ease both;
+  }
+
+  .hero-title span {
+    display: block;
+    -webkit-text-stroke: 1px var(--green);
+    color: transparent;
+  }
+
+  .hero-subtitle {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--cyan);
+    margin-top: 1.5rem;
+    letter-spacing: 0.08em;
+    animation: fadeDown 0.7s 0.2s ease both;
+  }
+
+  .hero-meta {
+    display: flex;
+    gap: 2rem;
+    margin-top: 2.5rem;
+    flex-wrap: wrap;
+    animation: fadeDown 0.7s 0.3s ease both;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .meta-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .meta-value {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--green);
+  }
+
+  .scroll-hint {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    animation: bounce 2s ease-in-out infinite;
+  }
+
+  .scroll-hint::after {
+    content: '↓';
+    font-size: 1rem;
+    color: var(--green);
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(6px); }
+  }
+
+  /* ── MAIN CONTENT ── */
+  .main { max-width: 900px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+
+  /* ── SECTION HEADERS ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    margin-top: 4rem;
+  }
+
+  .section-number {
+    font-family: var(--display);
+    font-size: 5rem;
+    line-height: 1;
+    -webkit-text-stroke: 1px var(--border);
+    color: transparent;
+  }
+
+  .section-info { flex: 1; }
+
+  .section-tag {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--green);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+  }
+
+  .section-title {
+    font-family: var(--display);
+    font-size: 2.2rem;
+    letter-spacing: 0.04em;
+    color: var(--white);
+  }
+
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--green-dim), transparent);
+  }
+
+  /* ── STEP CARDS ── */
+  .step-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    border-radius: 2px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+    transition: border-color 0.2s, transform 0.2s;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .step-card:hover {
+    border-color: var(--green);
+    transform: translateX(4px);
+  }
+
+  .step-card:nth-child(2) { animation-delay: 0.05s; }
+  .step-card:nth-child(3) { animation-delay: 0.10s; }
+  .step-card:nth-child(4) { animation-delay: 0.15s; }
+  .step-card:nth-child(5) { animation-delay: 0.20s; }
+
+  .step-number {
+    position: absolute;
+    top: -1px;
+    right: 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--bg);
+    background: var(--green);
+    padding: 0.15rem 0.6rem;
+    letter-spacing: 0.1em;
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+  }
+
+  .step-icon {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--green);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    background: rgba(0,255,136,0.05);
+    flex-shrink: 0;
+  }
+
+  .step-title {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    color: var(--white);
+    letter-spacing: 0.05em;
+  }
+
+  .step-body { font-size: 0.95rem; line-height: 1.75; color: var(--text); }
+  .step-body p { margin-bottom: 0.8rem; }
+  .step-body p:last-child { margin-bottom: 0; }
+
+  /* ── CODE BLOCKS ── */
+  .code-block {
+    background: #080b0f;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    border-radius: 2px;
+    padding: 1.25rem 1.5rem;
+    margin: 1rem 0;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  .code-block::before {
+    content: attr(data-label);
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--muted);
+    background: var(--border);
+    padding: 0.2rem 0.6rem;
+    letter-spacing: 0.1em;
+  }
+
+  .code-block code {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--cyan);
+    display: block;
+    white-space: pre;
+  }
+
+  .code-block code .comment { color: var(--muted); }
+  .code-block code .keyword { color: var(--yellow); }
+  .code-block code .value { color: var(--green); }
+  .code-block code .path { color: #ff9f43; }
+
+  /* ── INLINE CODE ── */
+  code:not(.block) {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: rgba(0,229,255,0.08);
+    color: var(--cyan);
+    padding: 0.1em 0.4em;
+    border-radius: 2px;
+    border: 1px solid rgba(0,229,255,0.15);
+  }
+
+  /* ── FLAG CARD ── */
+  .flag-card {
+    background: linear-gradient(135deg, rgba(0,255,136,0.06), rgba(0,229,255,0.04));
+    border: 1px solid rgba(0,255,136,0.4);
+    border-radius: 2px;
+    padding: 1.5rem 2rem;
+    margin: 1.2rem 0;
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .flag-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(0,255,136,0.03), transparent);
+    animation: shimmer 3s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  .flag-icon { font-size: 1.8rem; flex-shrink: 0; }
+
+  .flag-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+
+  .flag-value {
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--green);
+    letter-spacing: 0.05em;
+    word-break: break-all;
+  }
+
+  /* ── SCREENSHOT PLACEHOLDER ── */
+  .screenshot {
+    background: var(--surface);
+    border: 1px dashed var(--muted);
+    border-radius: 2px;
+    padding: 3rem 2rem;
+    margin: 1.2rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .screenshot:hover {
+    border-color: var(--green);
+    background: rgba(0,255,136,0.03);
+  }
+
+  .screenshot-icon { font-size: 2rem; opacity: 0.4; }
+
+  .screenshot-label {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  .screenshot-hint {
+    font-size: 0.75rem;
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
+  /* ── HIGHLIGHT TEXT ── */
+  .hl-green { color: var(--green); font-weight: 500; }
+  .hl-cyan { color: var(--cyan); }
+  .hl-yellow { color: var(--yellow); }
+  .hl-red { color: var(--red); }
+
+  /* ── TECHNIQUE TAGS ── */
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    padding: 0.25rem 0.7rem;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
+  }
+
+  .tag-green { background: rgba(0,255,136,0.1); color: var(--green); border: 1px solid rgba(0,255,136,0.2); }
+  .tag-cyan { background: rgba(0,229,255,0.1); color: var(--cyan); border: 1px solid rgba(0,229,255,0.2); }
+  .tag-yellow { background: rgba(255,209,102,0.1); color: var(--yellow); border: 1px solid rgba(255,209,102,0.2); }
+  .tag-red { background: rgba(255,69,96,0.1); color: var(--red); border: 1px solid rgba(255,69,96,0.2); }
+
+  /* ── SUMMARY TABLE ── */
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    margin-top: 1.5rem;
+  }
+
+  .summary-table th {
+    background: rgba(0,255,136,0.08);
+    color: var(--green);
+    padding: 0.7rem 1rem;
+    text-align: left;
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid var(--border);
+    font-weight: normal;
+  }
+
+  .summary-table td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+  }
+
+  .summary-table tr:last-child td { border-bottom: none; }
+  .summary-table tr:hover td { background: rgba(0,255,136,0.03); }
+
+  /* ── FOOTER ── */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 2rem;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  .footer span { color: var(--green); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── DIVIDER ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 3rem 0;
+  }
+
+  /* ── BACK LINK ── */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: 0.1em;
+    margin-bottom: 2rem;
+    transition: color 0.2s;
+  }
+
+  .back-link::before { content: '←'; color: var(--green); }
+  .back-link:hover { color: var(--green); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .hero-meta { gap: 1.2rem; }
+    .section-number { font-size: 3.5rem; }
+    .section-title { font-size: 1.7rem; }
+  }
+
+  /* ── LIGHTBOX ── */
+  .lightbox-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 99999;
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-out;
+    padding: 1.5rem;
+  }
+
+  .lightbox-overlay.active { display: flex; }
+
+  .lightbox-overlay img {
+    max-width: 95vw;
+    max-height: 92vh;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    box-shadow: 0 0 80px rgba(0,0,0,0.8);
+    cursor: zoom-out;
+    object-fit: contain;
+  }
+
+  .lightbox-close {
+    position: fixed;
+    top: 1.2rem;
+    right: 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  .lightbox-close:hover { color: var(--green); }
+
+  .lightbox-hint {
+    position: fixed;
+    bottom: 1.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+  }
+
+  /* Make screenshots feel clickable */
+  .step-body img {
+    cursor: zoom-in;
+    transition: opacity 0.2s, border-color 0.2s;
+  }
+
+  .step-body img:hover {
+    opacity: 0.85;
+    border-color: var(--green) !important;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HERO ── -->
+<header class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-content">
+    <a class="back-link" href="../index.html">Back to Portfolio</a>
+    <div class="badge">TryHackMe — Room Walkthrough</div>
+    <h1 class="hero-title">
+      Traverse
+      <span>Room</span>
+    </h1>
+    <p class="hero-subtitle">// Web Enumeration · Source Analysis · IDOR · Privilege Escalation</p>
+
+    <p style="font-family:var(--mono);font-size:0.65rem;color:var(--green);letter-spacing:0.2em;text-transform:uppercase;margin-top:2rem;margin-bottom:0.5rem;">// Room Scenario</p>
+    <p style="max-width:680px;font-size:0.95rem;color:var(--muted);line-height:1.8;text-align:left;">
+      Bob is a security engineer at a firm and works closely with the software/DevOps team to develop a tourism web application. Once the website was moved from QA to Production, the team noticed that the website was getting hacked daily and wanted to know the exact reason. Bob consulted the blue team as well but has yet to be successful. Therefore, he finally enrolled in the <span style="color:var(--cyan);">Software Security</span> pathway at <span style="color:var(--green);">TryHackMe</span> to learn if he was doing something wrong.
+    </p>
+    <div class="hero-meta">
+      <div class="meta-item">
+        <span class="meta-label">Platform</span>
+        <span class="meta-value">TryHackMe</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Category</span>
+        <span class="meta-value">Web / CTF</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Flags Captured</span>
+        <span class="meta-value">04 / 04</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Status</span>
+        <span class="meta-value">✓ Completed</span>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-hint">SCROLL</div>
+</header>
+
+<!-- ── MAIN ── -->
+<main class="main">
+
+  <!-- OVERVIEW -->
+  <div class="section-header">
+    <div class="section-number">00</div>
+    <div class="section-info">
+      <div class="section-tag">// Overview</div>
+      <div class="section-title">Attack Summary</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th>Phase</th>
+        <th>Technique</th>
+        <th>Finding</th>
+        <th>Flag</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Recon</td>
+        <td>View Source / JS Analysis</td>
+        <td>Hex-encoded flag in custom.min.js</td>
+        <td style="color:var(--green);font-family:var(--mono);font-size:0.75rem;">DIRECTORY LISTING IS THE ONLY WAY</td>
+      </tr>
+      <tr>
+        <td>Enumeration</td>
+        <td>Directory Listing</td>
+        <td>/logs → email_dump.txt with credentials</td>
+        <td style="color:var(--green);font-family:var(--mono);font-size:0.75rem;">THM{100100111}</td>
+      </tr>
+      <tr>
+        <td>IDOR</td>
+        <td>Parameter Tampering</td>
+        <td>Customer data via customer_id parameter</td>
+        <td style="color:var(--muted);font-family:var(--mono);font-size:0.75rem;">—</td>
+      </tr>
+      <tr>
+        <td>Privilege Escalation</td>
+        <td>DOM Manipulation + RCE</td>
+        <td>ls -la output leaks file manager password</td>
+        <td style="color:var(--green);font-family:var(--mono);font-size:0.75rem;">THM{10101}</td>
+      </tr>
+      <tr>
+        <td>Post-Exploitation</td>
+        <td>File Manager / Code Edit</td>
+        <td>Restored index.php via renamed_file_manager.php</td>
+        <td style="color:var(--green);font-family:var(--mono);font-size:0.75rem;">THM{WEBSITE_RESTORED}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="divider"></div>
+
+  <!-- STEP 1 -->
+  <div class="section-header">
+    <div class="section-number">01</div>
+    <div class="section-info">
+      <div class="section-tag">// Recon</div>
+      <div class="section-title">Source Analysis & Flag 1</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 01</div>
+    <div class="step-header">
+      <div class="step-icon">🔍</div>
+      <div class="step-title">VIEW SOURCE → JavaScript Enumeration</div>
+    </div>
+    <div class="step-body">
+      <p>Starting with a basic <span class="hl-green">View Page Source</span> on the target webpage revealed two JavaScript files being loaded — <code>tailwind.min.js</code> and the suspicious <code>custom.min.js</code>. The commented-out <code>/logs</code> directory reference was also visible, left in by the DevOps team.</p>
+
+      <img src="View_source.png" alt="View Page Source revealing JS files and logs directory" style="width:100%;border-radius:2px;border:1px solid var(--border);margin:1rem 0;display:block;">
+
+      <p>Opening <code>custom.min.js</code> directly in the browser revealed what appeared to be an encoded string. The encoding pattern was consistent with <span class="hl-yellow">hexadecimal encoding</span>.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-green">View Source</span>
+      <span class="tag tag-cyan">JS Enumeration</span>
+      <span class="tag tag-yellow">Hex Encoding</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 02</div>
+    <div class="step-header">
+      <div class="step-icon">🧪</div>
+      <div class="step-title">CyberChef Decoding</div>
+    </div>
+    <div class="step-body">
+      <p>The encoded string from <code>custom.min.js</code> was pasted into <span class="hl-green">CyberChef</span> and the <em>From Hex</em> recipe was applied, successfully decoding the value to reveal the first flag.</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// HEX ENCODED CONTENT IN custom.min.js</p>
+      <img src="Hex_encoded_java_script.png" alt="Hex encoded content inside custom.min.js" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <p>The file contained a comment left by the attacker — <span class="hl-red">// I WILL KEEP THE OBFUSCATED SO NO ONE CAN UNDERSTAND</span> — followed by a large block of space-separated hex values. This confirmed hex encoding was being used to hide the malicious code from developers inspecting the file.</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// CYBERCHEF FROM HEX DECODE</p>
+      <img src="CyberChef_hex_file.png" alt="CyberChef decoding the hex encoded JavaScript" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <p>Decoding the hex in CyberChef using the <span class="hl-cyan">From Hex</span> recipe with a <span class="hl-yellow">Space</span> delimiter revealed a deobfuscated JavaScript function. The output contained several variables that together formed the flag:</p>
+
+      <div class="code-block" data-label="DECODED OUTPUT">
+        <code><span class="keyword">var</span> n = <span class="value">"DIRECTORY"</span>;
+<span class="keyword">var</span> e = <span class="value">"LISTING"</span>;
+<span class="keyword">var</span> os = <span class="value">"IS THE"</span>;
+<span class="keyword">var</span> i = <span class="value">"ONLY WAY"</span>;
+<span class="comment">↳ console.log("Flag:" + n + " " + e + " " + os + " " + i)</span>
+<span class="comment">↳ Flag: DIRECTORY LISTING IS THE ONLY WAY</span></code>
+      </div>
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div style="margin-bottom:0.6rem;">
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What type of encoding is used by the hackers to obfuscate the JavaScript file?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: HEX</div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the flag value after deobfuscating the file?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: DIRECTORY LISTING IS THE ONLY WAY</div>
+        </div>
+      </div>
+
+      <div class="flag-card">
+        <div class="flag-icon">🚩</div>
+        <div>
+          <div class="flag-label">Flag 1 Captured</div>
+          <div class="flag-value">DIRECTORY LISTING IS THE ONLY WAY</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-green">CyberChef</span>
+      <span class="tag tag-yellow">From Hex</span>
+      <span class="tag tag-green">Flag Captured</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- STEP 2 -->
+  <div class="section-header">
+    <div class="section-number">02</div>
+    <div class="section-info">
+      <div class="section-tag">// Enumeration</div>
+      <div class="section-title">Directory Listing & Credential Discovery</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 03</div>
+    <div class="step-header">
+      <div class="step-icon">📂</div>
+      <div class="step-title">Exposed /logs Directory</div>
+    </div>
+    <div class="step-body">
+      <p>Returning to the page source revealed a reference to a <code>/logs</code> directory. Navigating directly to it confirmed directory listing was enabled — a misconfiguration that exposed server files to anyone who knew the path.</p>
+
+      <div class="code-block" data-label="URL">
+        <code><span class="path">http://10.48.130.32</span>/logs/
+<span class="comment">↳ Apache/2.4.41 (Ubuntu) — directory listing enabled</span>
+<span class="comment">↳ email_dump.txt — 2023-05-26 06:11 — 450 bytes</span></code>
+      </div>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// INDEX OF /logs — DIRECTORY LISTING EXPOSED</p>
+      <img src="Index_of_logs.png" alt="Apache directory listing showing email_dump.txt" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <p>The Apache server had <span class="hl-red">directory listing enabled</span>, meaning anyone who knew or guessed the path could browse its contents freely. The exposed file <code>email_dump.txt</code> was only <span class="hl-yellow">450 bytes</span> — small enough to be an internal message — and dated <span class="hl-yellow">2023-05-26</span>, suggesting it was left behind during the QA-to-Production migration. The server footer also revealed the underlying technology stack: <span class="hl-cyan">Apache/2.4.41 running on Ubuntu at 10.48.130.32 Port 80</span> — useful intelligence for further exploitation.</p>
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: Logging is an important aspect. What is the name of the file containing email dumps?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: email_dump.txt</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">Directory Listing</span>
+      <span class="tag tag-cyan">Misconfiguration</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 04</div>
+    <div class="step-header">
+      <div class="step-icon">📧</div>
+      <div class="step-title">Email Dump Analysis</div>
+    </div>
+    <div class="step-body">
+      <p>Opening <code>email_dump.txt</code> revealed a plaintext email sent from <span class="hl-green">bob@tourism.mht</span> to <span class="hl-green">mark@tourism.mht</span> with the subject <span class="hl-yellow">API Credentials</span>. Bob had created a password-protected directory containing all the required API information and left the credentials in an unencrypted email — a serious security oversight.</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// EMAIL_DUMP.TXT CONTENTS</p>
+      <img src="Email_dump_text.png" alt="email_dump.txt showing API credentials from Bob to Mark" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <p>Key intelligence extracted from the email:</p>
+      <p>• <span class="hl-cyan">From:</span> bob@tourism.mht &nbsp;→&nbsp; <span class="hl-cyan">To:</span> mark@tourism.mht &nbsp;→&nbsp; <span class="hl-yellow">Subject: API Credentials</span></p>
+      <p>• The API directory was named after the <span class="hl-yellow">first phase of the SSDLC</span> — confirmed as <strong style="color:var(--white);">Planning</strong>.</p>
+      <p>• The page is <span class="hl-red">password protected</span> and can only be opened with the key included in the email — leaked in plaintext.</p>
+
+      <div class="flag-card">
+        <div class="flag-icon">🔑</div>
+        <div>
+          <div class="flag-label">Key File / Password — leaked in plaintext email</div>
+          <div class="flag-value">THM{100100111}</div>
+        </div>
+      </div>
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div style="margin-bottom:0.6rem;">
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: The logs folder contains email logs and has a message for the software team lead. What is the name of the directory that Bob has created?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: planning</div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the key file for opening the directory that Bob has created for Mark?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: THM{100100111}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">OSINT</span>
+      <span class="tag tag-red">Credential Exposure</span>
+      <span class="tag tag-cyan">SSDLC Reference</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- STEP 3 -->
+  <div class="section-header">
+    <div class="section-number">03</div>
+    <div class="section-info">
+      <div class="section-tag">// IDOR</div>
+      <div class="section-title">Insecure Direct Object Reference</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 05</div>
+    <div class="step-header">
+      <div class="step-icon">🔑</div>
+      <div class="step-title">Accessing the /planning Directory</div>
+    </div>
+    <div class="step-body">
+      <p>Navigating to the <code>/planning</code> directory and submitting the key <code>THM{100100111}</code> granted access to the <span class="hl-green">Tourism MHT</span> API documentation page. This page openly documented how to query customer records — with no authentication beyond the directory password.</p>
+
+      <div class="code-block" data-label="URL">
+        <code><span class="path">http://10.48.130.32</span>/planning/
+<span class="comment">Password: THM{100100111}</span></code>
+      </div>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// /planning — API DOCUMENTATION PAGE</p>
+      <img src="Planning_directory_with_API.png" alt="Planning directory showing API instructions and response schema" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <p>The page revealed the full API specification:</p>
+      <p>• <span class="hl-cyan">Base URL:</span> MACHINE IP Address</p>
+      <p>• <span class="hl-cyan">Endpoint:</span> <code>api/?customer_id=1</code></p>
+      <p>• <span class="hl-cyan">HTTP Method:</span> <code>GET</code></p>
+      <p>• <span class="hl-cyan">Parameter:</span> <code>{id}</code> — the customer ID for retrieving customer information</p>
+
+      <p>The example API response schema exposed exactly what each record would return — critically including <span class="hl-red">sensitive fields</span> with no access control:</p>
+
+      <div class="code-block" data-label="API RESPONSE SCHEMA — REAL EXAMPLE (customer_id=1)">
+        <code>{
+  <span class="keyword">"data"</span>: {
+    <span class="value">"id"</span>: <span class="value">"1"</span>,
+    <span class="value">"name"</span>: <span class="value">"string"</span>,
+    <span class="value">"email"</span>: <span class="value">"example@example.com"</span>,
+    <span class="value">"password"</span>: <span class="value">"******"</span>,              <span class="comment">← stored in plaintext, exposed per-record</span>
+    <span class="value">"timestamp"</span>: <span class="value">"2023-05-23 04:47:25"</span>,  <span class="comment">← real date seen across records</span>
+    <span class="value">"role"</span>: <span class="value">"user"</span> <span class="comment">or</span> <span class="value">"admin"</span>,          <span class="comment">← role fully disclosed</span>
+    <span class="value">"loginURL"</span>: <span class="value">"/client"</span> <span class="comment">or</span> <span class="value">"/realadmin"</span>, <span class="comment">← leaks admin panel path</span>
+    <span class="value">"isadmin"</span>: <span class="value">"0"</span> <span class="comment">or</span> <span class="value">"1"</span>              <span class="comment">← trivially identifies admin accounts</span>
+  },
+  <span class="keyword">"response_code"</span>: <span class="value">200</span>,
+  <span class="keyword">"response_desc"</span>: <span class="value">"Success"</span>
+}</code>
+      </div>
+
+      <p>The <span class="hl-red">password</span>, <span class="hl-red">role</span>, <span class="hl-red">loginURL</span> and <span class="hl-red">isadmin</span> fields were particularly dangerous — passwords were stored and returned in <span class="hl-red">plaintext</span>, and by simply incrementing <code>customer_id</code> it was possible to identify any admin account, retrieve their password, and get the exact login path — all in a single unauthenticated GET request.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-green">Auth Bypass</span>
+      <span class="tag tag-cyan">API Discovery</span>
+      <span class="tag tag-red">Sensitive Data Exposure</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 06</div>
+    <div class="step-header">
+      <div class="step-icon">🔢</div>
+      <div class="step-title">ID Parameter Enumeration</div>
+    </div>
+    <div class="step-body">
+      <p>By incrementing the <code>customer_id</code> parameter starting at <code>customer_id=1</code>, each request returned a different customer record. There was <span class="hl-red">no access control</span> validating which users could view which records — a classic <span class="hl-green">IDOR vulnerability</span>. The response schema had already revealed that each record would expose role, loginURL and isadmin fields, making admin enumeration trivial.</p>
+
+      <div class="code-block" data-label="IDOR ENUMERATION">
+        <code><span class="path">http://10.48.130.32</span>/api/?<span class="keyword">customer_id</span>=<span class="value">1</span>  <span class="comment">← start here</span>
+<span class="path">http://10.48.130.32</span>/api/?<span class="keyword">customer_id</span>=<span class="value">2</span>
+<span class="path">http://10.48.130.32</span>/api/?<span class="keyword">customer_id</span>=<span class="value">3</span>  <span class="comment">← isadmin: true + loginURL → /realadmin</span>
+<span class="path">http://10.48.130.32</span>/api/?<span class="keyword">customer_id</span>=<span class="value">4</span>
+<span class="path">http://10.48.130.32</span>/api/?<span class="keyword">customer_id</span>=<span class="value">5</span>  <span class="comment">← john@traverse.com</span></code>
+      </div>
+
+      <p>Key findings from enumeration:</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// API RESPONSE — customer_id=5</p>
+      <img src="Email_address_for_ID_5.png" alt="API response for customer_id=5 showing john@traverse.com" style="width:100%;max-width:360px;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <p>• <code>customer_id=5</code> — <span class="hl-green">John</span>, email <span class="hl-green">john@traverse.com</span>, password <span class="hl-red">qwerty5</span>, role <span class="hl-yellow">user</span>, loginURL <code>/client</code>, isadmin <span class="hl-yellow">0</span>. Timestamp <code>2023-05-23 04:47:25</code>.</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// API RESPONSE — customer_id=3 (ADMIN)</p>
+      <img src="ID_for_Admin_user.png" alt="API response for customer_id=3 showing admin account details" style="width:100%;max-width:360px;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <p>• <code>customer_id=3</code> — <span class="hl-red">admin</span>, email <span class="hl-red">realadmin@traverse.com</span>, password <span class="hl-red">admin_key!!!</span>, role <span class="hl-red">admin</span>, loginURL <code>/realadmin</code>, isadmin <span class="hl-red">1</span>. The <span class="hl-red">plaintext password</span> and <span class="hl-red">admin login path</span> were both returned directly in the API response with no authorisation check whatsoever.</p>
+
+      <div class="code-block" data-label="CREDENTIALS EXTRACTED">
+        <code><span class="comment">── ID 5 (John) ──────────────────────────</span>
+<span class="keyword">email</span>     <span class="value">john@traverse.com</span>
+<span class="keyword">password</span>  <span class="value">qwerty5</span>
+<span class="keyword">role</span>      user  |  isadmin: 0
+<span class="keyword">loginURL</span>  /client
+
+<span class="comment">── ID 3 (Admin) ─────────────────────────</span>
+<span class="keyword">email</span>     <span class="value">realadmin@traverse.com</span>
+<span class="keyword">password</span>  <span class="value">admin_key!!!</span>           <span class="comment">← plaintext!</span>
+<span class="keyword">role</span>      admin  |  isadmin: 1
+<span class="keyword">loginURL</span>  <span class="value">/realadmin</span>             <span class="comment">← admin panel path</span></code>
+      </div>
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div style="margin-bottom:0.6rem;">
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the email address for ID 5 using the leaked API endpoint?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: john@traverse.com</div>
+        </div>
+        <div style="margin-bottom:0.6rem;">
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the ID for the user with admin privileges?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: 3</div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the endpoint for logging in as the admin?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: /realadmin</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">IDOR</span>
+      <span class="tag tag-yellow">Parameter Tampering</span>
+      <span class="tag tag-red">Broken Access Control</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- STEP 4 -->
+  <div class="section-header">
+    <div class="section-number">04</div>
+    <div class="section-info">
+      <div class="section-tag">// Privilege Escalation</div>
+      <div class="section-title">Admin RCE via DOM Manipulation</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 07</div>
+    <div class="step-header">
+      <div class="step-icon">⚙️</div>
+      <div class="step-title">Admin Panel — Command Execution</div>
+    </div>
+    <div class="step-body">
+      <p>Navigating to <code>/realadmin</code> and logging in with credentials <span class="hl-red">admin_key!!!</span> granted access to the <span class="hl-green">Tourism MHT Admin Page</span>. The panel immediately revealed useful system intelligence:</p>
+      <p>• <span class="hl-cyan">OS Version:</span> #84~20.04.1-Ubuntu SMP Mon Jan 20 22:14:54 UTC 2025</p>
+      <p>• <span class="hl-cyan">Logged-in User:</span> <span class="hl-yellow">ubuntu</span> — confirming the web server runs as the ubuntu system user</p>
+      <p>• <span class="hl-cyan">Server Path:</span> <code>/var/www/html/realadmin</code> — exposed by running the Current Directory command</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// ADMIN PANEL — COMMAND DROPDOWN</p>
+      <img src="Admin_login_page.png" alt="Tourism MHT admin page showing command execution dropdown" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <p>The panel offered only two commands via a dropdown — <span class="hl-yellow">System Owner</span> (mapped to <code>whoami</code>) and <span class="hl-yellow">Current Directory</span> (mapped to <code>pwd</code>). Opening <span class="hl-green">DevTools → Elements tab</span> revealed the underlying form, which POSTs to <code>main.php</code> with a select element named <code>commands</code>.</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// DEVTOOLS — ELEMENTS TAB REVEALING FORM STRUCTURE</p>
+      <img src="Developer_tools_admin_page.png" alt="DevTools Elements tab showing form posting to main.php with whoami and pwd options" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <div class="code-block" data-label="HTML — FORM & DROPDOWN">
+        <code><span class="keyword">&lt;form</span> method=<span class="value">"POST"</span> name=<span class="value">"main.php"</span>&gt;
+  <span class="keyword">&lt;select</span> name=<span class="value">"commands"</span>&gt;
+    <span class="keyword">&lt;option</span> value=<span class="value">"whoami"</span>&gt;System Owner&lt;/option&gt;
+    <span class="keyword">&lt;option</span> value=<span class="value">"pwd"</span>&gt;Current Directory&lt;/option&gt;
+  &lt;/select&gt;
+&lt;/form&gt;
+<span class="comment">↳ No server-side validation on the value submitted</span></code>
+      </div>
+
+      <p>Right-clicking the <code>&lt;select&gt;</code> element in the Elements panel and choosing <span class="hl-green">Edit as HTML</span> allowed direct modification of the DOM without touching the server.</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// RIGHT-CLICK → EDIT AS HTML</p>
+      <img src="Edit_as_HTML_admin_page.png" alt="DevTools right-click context menu showing Edit as HTML option" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <p>A third option was injected directly into the <code>&lt;select&gt;</code> element with a value of <code>ls-la</code> and label <em>List Files and Directorys</em>. Since the server performed no validation on the submitted command value, it executed whatever was passed.</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// INJECTED THIRD OPTION VISIBLE IN DOM</p>
+      <img src="Ls-al_command_added.png" alt="DevTools showing the injected ls-la option added to the dropdown" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <div class="code-block" data-label="DOM INJECTION">
+        <code><span class="keyword">&lt;option</span> value=<span class="value">"ls-la"</span>&gt;List Files and Directorys&lt;/option&gt;
+<span class="comment">↳ Injected into the DOM — accepted and executed by main.php</span></code>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">Remote Code Execution</span>
+      <span class="tag tag-yellow">DOM Manipulation</span>
+      <span class="tag tag-cyan">DevTools</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 08</div>
+    <div class="step-header">
+      <div class="step-icon">📋</div>
+      <div class="step-title">File Enumeration via ls -la</div>
+    </div>
+    <div class="step-body">
+      <p>Selecting the injected <span class="hl-yellow">List Files and Directorys</span> option and clicking Execute returned a full <code>ls -la</code> directory listing from the server at <code>/var/www/html/realadmin</code>. The output also unexpectedly leaked an additional password at the top of the response.</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// ls -la OUTPUT — /var/www/html/realadmin</p>
+      <img src="Files_listed_on_admin_page.png" alt="Admin page showing ls -la output with all files listed" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <p>The output contained a bonus credential at the very top — <span class="hl-red">Password for accessing original file manager: THM{10101}</span> — printed directly into the page response, likely hardcoded into <code>main.php</code>.</p>
+
+      <div class="code-block" data-label="COMMAND OUTPUT — ls -la">
+        <code><span class="hl-red" style="color:#ff4560;">Password for accessing original file manager: THM{10101}</span>
+total 212
+
+<span class="comment">drwxrwxrwx 2 ubuntu ubuntu   4096 May 26  2023 .</span>
+<span class="comment">drwxrwxrwx 9 root   root     4096 Jun  2  2023 ..</span>
+-rwxrwxrwx 1 ubuntu ubuntu   2425 May 26  2023 <span class="value">index.php</span>
+-rwxrwxrwx 1 ubuntu ubuntu   2879 May 26  2023 <span class="value">main.php</span>
+-rwxrwxrwx 1 ubuntu ubuntu <span class="value">193541</span> May 26  2023 <span class="value">renamed_file_manager.php</span>  <span class="comment">← 193KB — the file manager</span>
+-rwxrwxrwx 1 ubuntu ubuntu     <span class="value">70</span> May 26  2023 <span class="value">thm_shell.php</span>              <span class="comment">← 70 bytes — reverse shell</span></code>
+      </div>
+
+      <p>Key observations from the listing:</p>
+      <p>• All files are owned by <span class="hl-cyan">ubuntu:ubuntu</span> and have <span class="hl-red">777 permissions</span> — world-readable, writable and executable, a critical misconfiguration.</p>
+      <p>• The parent directory is owned by <span class="hl-red">root:root</span> — confirming the web server runs with elevated context.</p>
+      <p>• <code>thm_shell.php</code> is only <span class="hl-yellow">70 bytes</span> — consistent with a minimal PHP reverse shell one-liner uploaded by the attacker.</p>
+      <p>• <code>renamed_file_manager.php</code> is <span class="hl-yellow">193,541 bytes</span> — a full file manager application, renamed by the attacker to obscure its presence, which leads directly to the final flag.</p>
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div style="margin-bottom:0.6rem;">
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: The attacker uploaded a web shell and renamed a file used for managing the server. What is the name of the web shell uploaded?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: thm_shell.php</div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the name of the file renamed by the attacker for managing the web server?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: renamed_file_manager.php</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">File Disclosure</span>
+      <span class="tag tag-yellow">RCE Output</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- STEP 5 -->
+  <div class="section-header">
+    <div class="section-number">05</div>
+    <div class="section-info">
+      <div class="section-tag">// Post-Exploitation</div>
+      <div class="section-title">Final Flag</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">STEP 09</div>
+    <div class="step-header">
+      <div class="step-icon">🏁</div>
+      <div class="step-title">rename_file_manager.php → Flag 2</div>
+    </div>
+    <div class="step-body">
+      <p>Navigating to <code>renamed_file_manager.php</code> opened <span class="hl-green">My File Manager 2.2.2</span> — a full web-based file manager giving complete access to the web root at <code>/var/www/html</code>. The attacker had renamed it to hide it from the site owner.</p>
+
+      <div class="code-block" data-label="URL">
+        <code><span class="path">http://10.48.130.32</span>/realadmin/<span class="value">renamed_file_manager.php</span></code>
+      </div>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// FILE MANAGER — FULL WEB ROOT EXPOSED</p>
+      <img src="File_manager_for_website.png" alt="My File Manager 2.2.2 showing full web root contents" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <p>The file manager revealed the complete web root structure — <span class="hl-yellow">7 folders</span> and <span class="hl-yellow">8 files</span>, total size <span class="hl-yellow">352.58 KB</span>, all owned by <span class="hl-red">ubuntu:ubuntu</span> with <span class="hl-red">0777 permissions</span>. Notably all the directories discovered throughout the room were visible — <code>api</code>, <code>client</code>, <code>logs</code>, <code>planning</code>, and <code>realadmin</code> — confirming the full attack surface.</p>
+
+      <p>Opening <code>index.php</code> via the file manager revealed the source of the defacement. The attacker had set <span class="hl-red">$message = "FINALLY HACKED"</span> and the page logic checks this variable — if it equals "FINALLY HACKED" the defaced message is shown, otherwise the flag is displayed.</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// index.php SOURCE — DEFACEMENT LOGIC</p>
+      <img src="File_manager_index_php.png" alt="index.php source showing FINALLY HACKED message and flag logic" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <div class="code-block" data-label="index.php — KEY LOGIC">
+        <code><span class="comment">// Attacker injected this:</span>
+<span class="keyword">$message</span> = <span class="value">"FINALLY HACKED"</span>;
+
+<span class="comment">// Original conditional logic:</span>
+<span class="keyword">if</span>(<span class="keyword">$message</span> != <span class="value">"FINALLY HACKED"</span>) {
+  echo <span class="value">'&lt;h1&gt;SUCCESSFULLY RESTORED WEBSITE FLAG: THM{WEBSITE_RESTORED}&lt;/h1&gt;'</span>;
+} <span class="keyword">else</span> {
+  <span class="comment">// echo $message → shows "FINALLY HACKED !!! I HATE MINIFIED JAVASCRIPT"</span>
+}
+<span class="comment">↳ Fix: change $message to anything other than "FINALLY HACKED"</span></code>
+      </div>
+
+      <p>Using the file manager's <span class="hl-green">Edit</span> function, <code>$message</code> was changed from <span class="hl-red">"FINALLY HACKED"</span> to any other value, triggering the flag condition. Reloading the main site confirmed the restoration.</p>
+
+      <p style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:0.4rem;">// WEBSITE RESTORED — FINAL FLAG</p>
+      <img src="Final_flag_website_restored.png" alt="Tourism MHT website showing SUCCESSFULLY RESTORED WEBSITE FLAG" style="width:100%;border-radius:2px;border:1px solid var(--border);margin-bottom:1rem;display:block;">
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: Can you use the file manager to restore the original website by removing the "FINALLY HACKED" message? What is the flag value after restoring the main website?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: THM{WEBSITE_RESTORED}</div>
+        </div>
+      </div>
+
+      <div class="flag-card">
+        <div class="flag-icon">🚩</div>
+        <div>
+          <div class="flag-label">Flag 2 Captured — Room Complete</div>
+          <div class="flag-value">THM{WEBSITE_RESTORED}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-green">Flag Captured</span>
+      <span class="tag tag-green">Room Complete</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- KEY LEARNINGS -->
+  <div class="section-header">
+    <div class="section-number">06</div>
+    <div class="section-info">
+      <div class="section-tag">// Reflection</div>
+      <div class="section-title">Key Takeaways</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">🔍</div>
+      <div class="step-title">Always Inspect Client-Side Files</div>
+    </div>
+    <div class="step-body">
+      <p><span class="hl-green">View Page Source</span> is always the first step. The commented-out <code>/logs</code> reference and the suspicious <code>custom.min.js</code> were both found immediately — before any active scanning. Secrets encoded in client-side JavaScript are never truly hidden; tools like CyberChef make decoding trivial in seconds.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">Recon</span>
+      <span class="tag tag-yellow">Hex Encoding</span>
+      <span class="tag tag-cyan">CyberChef</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">📂</div>
+      <div class="step-title">Directory Listing is a Critical Misconfiguration</div>
+    </div>
+    <div class="step-body">
+      <p>The Apache server at <span class="hl-cyan">10.48.130.32</span> had directory listing enabled on <code>/logs</code>, directly exposing <code>email_dump.txt</code>. That single file contained plaintext credentials, the name of a hidden directory, and internal email addresses — all the intelligence needed to move to the next phase. Disabling directory listing in Apache with <code>Options -Indexes</code> would have prevented this entirely.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">Directory Listing</span>
+      <span class="tag tag-red">Apache Misconfiguration</span>
+      <span class="tag tag-yellow">OWASP A05</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">📧</div>
+      <div class="step-title">Never Send Credentials Over Email</div>
+    </div>
+    <div class="step-body">
+      <p>Bob sent the password <span class="hl-red">THM{100100111}</span> to Mark in a plaintext email stored unencrypted on the server. Credentials should never be transmitted via email — a secrets manager, encrypted channel, or one-time password system should be used instead. The email also named the directory after a predictable SSDLC phase, making it guessable even without the log exposure.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">Credential Exposure</span>
+      <span class="tag tag-yellow">Poor Secret Management</span>
+      <span class="tag tag-cyan">SSDLC</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">🔢</div>
+      <div class="step-title">IDOR — Enforce Authorisation on Every API Endpoint</div>
+    </div>
+    <div class="step-body">
+      <p>The customer API returned full records — including <span class="hl-red">plaintext passwords</span>, roles, login URLs and admin flags — to anyone with the directory password, with no per-user authorisation check. Incrementing <code>customer_id</code> from 1 to 5 exposed every account on the system. The admin password <span class="hl-red">admin_key!!!</span> and the path <code>/realadmin</code> were both returned in a single unauthenticated GET request. Every API endpoint must verify that the requesting user is authorised to access the specific resource being requested.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">IDOR</span>
+      <span class="tag tag-red">Plaintext Passwords</span>
+      <span class="tag tag-red">Broken Access Control</span>
+      <span class="tag tag-yellow">OWASP A01</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">⚙️</div>
+      <div class="step-title">Never Trust Client-Side Input — Validate on the Server</div>
+    </div>
+    <div class="step-body">
+      <p>The admin command execution panel restricted users to two dropdown options in the browser — but the server accepted any value submitted to <code>main.php</code> without validation. A three-word DOM edit in DevTools bypassed the entire control. Any security restriction implemented only in the browser UI is trivially defeated. All input must be validated and whitelisted server-side, regardless of what the frontend allows.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">RCE</span>
+      <span class="tag tag-yellow">DOM Manipulation</span>
+      <span class="tag tag-red">No Server-Side Validation</span>
+      <span class="tag tag-yellow">OWASP A03</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">🔒</div>
+      <div class="step-title">File Permissions and Web Root Hygiene</div>
+    </div>
+    <div class="step-body">
+      <p>Every file in <code>/var/www/html/realadmin</code> had <span class="hl-red">0777 permissions</span> — world-readable, writable, and executable. This allowed the attacker to upload <code>thm_shell.php</code> (a 70-byte reverse shell), rename the file manager to obscure it, and modify <code>index.php</code> directly. Web files should be owned by a dedicated service account, set to <code>644</code> for files and <code>755</code> for directories, and the web root should never be writable by the web server process.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">Insecure File Permissions</span>
+      <span class="tag tag-red">Web Shell Upload</span>
+      <span class="tag tag-yellow">OWASP A05</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">🌐</div>
+      <div class="step-title">Sensitive Tools Should Never Be Web-Accessible</div>
+    </div>
+    <div class="step-body">
+      <p>A full-featured file manager (<span class="hl-cyan">My File Manager 2.2.2</span>) was deployed inside the web root at <code>/realadmin/renamed_file_manager.php</code>, giving anyone who found it complete read/write access to the entire server. The attacker had renamed it to try to hide it — but the <code>ls -la</code> output revealed it instantly by its 193KB size. Administrative tools should never be placed in a publicly accessible web directory.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-red">Exposed Admin Tool</span>
+      <span class="tag tag-cyan">File Manager</span>
+      <span class="tag tag-yellow">OWASP A05</span>
+    </div>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <span>TryHackMe</span> · Traverse Room · CTF Walkthrough &nbsp;|&nbsp; E-Portfolio Write-Up
+</footer>
+
+<!-- ── LIGHTBOX ── -->
+<div class="lightbox-overlay" id="lightbox">
+  <div class="lightbox-close" id="lightbox-close">[ ESC / CLICK TO CLOSE ]</div>
+  <img id="lightbox-img" src="" alt="">
+  <div class="lightbox-hint">// CLICK ANYWHERE TO CLOSE</div>
+</div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', function() {
+    var overlay = document.getElementById('lightbox');
+    var lbImg   = document.getElementById('lightbox-img');
+
+    document.querySelectorAll('.step-body img').forEach(function(img) {
+      img.addEventListener('click', function() {
+        lbImg.src = img.src;
+        lbImg.alt = img.alt;
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      });
+    });
+
+    function closeLightbox() {
+      overlay.classList.remove('active');
+      lbImg.src = '';
+      document.body.style.overflow = '';
+    }
+
+    overlay.addEventListener('click', closeLightbox);
+    document.getElementById('lightbox-close').addEventListener('click', function(e) {
+      e.stopPropagation();
+      closeLightbox();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeLightbox();
+    });
+  });
+</script>
+
+</body>
+</html>
