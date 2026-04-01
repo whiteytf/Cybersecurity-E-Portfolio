@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Summit — TryHackMe Walkthrough</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #0f1318;
+    --card: #13181f;
+    --border: #1e2730;
+    --green: #00ff88;
+    --green-dim: #00cc6a;
+    --cyan: #00e5ff;
+    --red: #ff4560;
+    --yellow: #ffd166;
+    --text: #c9d1d9;
+    --muted: #58677a;
+    --white: #e8edf2;
+    --mono: 'Share Tech Mono', monospace;
+    --display: 'Bebas Neue', sans-serif;
+    --body: 'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ── SCAN LINES ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,255,136,0.015) 2px, rgba(0,255,136,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4rem 2rem 3rem;
+    overflow: hidden;
+  }
+
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    animation: gridPulse 8s ease-in-out infinite;
+  }
+
+  @keyframes gridPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  .hero-glow {
+    position: absolute;
+    width: 600px; height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%);
+    top: -150px; right: -100px;
+    animation: glowPulse 6s ease-in-out infinite;
+  }
+
+  @keyframes glowPulse {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.15); opacity: 1; }
+  }
+
+  .hero-content { position: relative; z-index: 2; max-width: 900px; margin: 0 auto; width: 100%; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(0,255,136,0.08);
+    border: 1px solid rgba(0,255,136,0.3);
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
+    margin-bottom: 1.5rem;
+    animation: fadeDown 0.6s ease both;
+  }
+
+  .badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: blink 1.2s step-start infinite;
+  }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  .hero-title {
+    font-family: var(--display);
+    font-size: clamp(5rem, 14vw, 11rem);
+    line-height: 0.9;
+    letter-spacing: 0.02em;
+    color: var(--white);
+    animation: fadeDown 0.7s 0.1s ease both;
+  }
+
+  .hero-title span {
+    display: block;
+    -webkit-text-stroke: 1px var(--green);
+    color: transparent;
+  }
+
+  .hero-subtitle {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--cyan);
+    margin-top: 1.5rem;
+    letter-spacing: 0.08em;
+    animation: fadeDown 0.7s 0.2s ease both;
+  }
+
+  .hero-meta {
+    display: flex;
+    gap: 2rem;
+    margin-top: 2.5rem;
+    flex-wrap: wrap;
+    animation: fadeDown 0.7s 0.3s ease both;
+  }
+
+  .meta-item { display: flex; flex-direction: column; gap: 0.2rem; }
+
+  .meta-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .meta-value {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--green);
+  }
+
+  .scroll-hint {
+    position: absolute;
+    bottom: 2rem; left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    animation: bounce 2s ease-in-out infinite;
+  }
+
+  .scroll-hint::after { content: '↓'; font-size: 1rem; color: var(--green); }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(6px); }
+  }
+
+  /* ── MAIN ── */
+  .main { max-width: 900px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+
+  /* ── SECTION HEADERS ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    margin-top: 4rem;
+  }
+
+  .section-number {
+    font-family: var(--display);
+    font-size: 5rem;
+    line-height: 1;
+    -webkit-text-stroke: 1px var(--border);
+    color: transparent;
+  }
+
+  .section-info { flex: 1; }
+
+  .section-tag {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--green);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+  }
+
+  .section-title {
+    font-family: var(--display);
+    font-size: 2.2rem;
+    letter-spacing: 0.04em;
+    color: var(--white);
+  }
+
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--green-dim), transparent);
+  }
+
+  /* ── STEP CARDS ── */
+  .step-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    border-radius: 2px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+    transition: border-color 0.2s, transform 0.2s;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .step-card:hover { border-color: var(--green); transform: translateX(4px); }
+
+  .step-card:nth-child(2) { animation-delay: 0.05s; }
+  .step-card:nth-child(3) { animation-delay: 0.10s; }
+  .step-card:nth-child(4) { animation-delay: 0.15s; }
+  .step-card:nth-child(5) { animation-delay: 0.20s; }
+  .step-card:nth-child(6) { animation-delay: 0.25s; }
+
+  .step-number {
+    position: absolute;
+    top: -1px; right: 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--bg);
+    background: var(--green);
+    padding: 0.15rem 0.6rem;
+    letter-spacing: 0.1em;
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+  }
+
+  .step-icon {
+    width: 36px; height: 36px;
+    border: 1px solid var(--green);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    background: rgba(0,255,136,0.05);
+    flex-shrink: 0;
+  }
+
+  .step-title {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    color: var(--white);
+    letter-spacing: 0.05em;
+  }
+
+  .step-body { font-size: 0.95rem; line-height: 1.75; color: var(--text); }
+  .step-body p { margin-bottom: 0.8rem; }
+  .step-body p:last-child { margin-bottom: 0; }
+
+  /* ── CODE BLOCK ── */
+  .code-block {
+    background: #080b0f;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    border-radius: 2px;
+    padding: 1.25rem 1.5rem;
+    margin: 1rem 0;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  .code-block::before {
+    content: attr(data-label);
+    position: absolute;
+    top: 0; right: 0;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--muted);
+    background: var(--border);
+    padding: 0.2rem 0.6rem;
+    letter-spacing: 0.1em;
+  }
+
+  .code-block code {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--cyan);
+    display: block;
+    white-space: pre;
+  }
+
+  .code-block code .comment { color: var(--muted); }
+  .code-block code .keyword { color: var(--yellow); }
+  .code-block code .value { color: var(--green); }
+
+  /* ── INLINE CODE ── */
+  code:not(.block) {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: rgba(0,229,255,0.08);
+    color: var(--cyan);
+    padding: 0.1em 0.4em;
+    border-radius: 2px;
+    border: 1px solid rgba(0,229,255,0.15);
+  }
+
+  /* ── FLAG CARD ── */
+  .flag-card {
+    background: linear-gradient(135deg, rgba(0,255,136,0.06), rgba(0,229,255,0.04));
+    border: 1px solid rgba(0,255,136,0.4);
+    border-radius: 2px;
+    padding: 1.5rem 2rem;
+    margin: 1.2rem 0;
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .flag-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(0,255,136,0.03), transparent);
+    animation: shimmer 3s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  .flag-icon { font-size: 1.8rem; flex-shrink: 0; }
+
+  .flag-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+
+  .flag-value {
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--green);
+    letter-spacing: 0.05em;
+    word-break: break-all;
+  }
+
+  /* ── HIGHLIGHT TEXT ── */
+  .hl-green { color: var(--green); font-weight: 500; }
+  .hl-cyan  { color: var(--cyan); }
+  .hl-yellow{ color: var(--yellow); }
+  .hl-red   { color: var(--red); }
+
+  /* ── TECHNIQUE TAGS ── */
+  .tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    padding: 0.25rem 0.7rem;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
+  }
+
+  .tag-green  { background: rgba(0,255,136,0.1);  color: var(--green);  border: 1px solid rgba(0,255,136,0.2); }
+  .tag-cyan   { background: rgba(0,229,255,0.1);  color: var(--cyan);   border: 1px solid rgba(0,229,255,0.2); }
+  .tag-yellow { background: rgba(255,209,102,0.1);color: var(--yellow); border: 1px solid rgba(255,209,102,0.2); }
+  .tag-red    { background: rgba(255,69,96,0.1);  color: var(--red);    border: 1px solid rgba(255,69,96,0.2); }
+
+  /* ── SUMMARY TABLE ── */
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    margin-top: 1.5rem;
+  }
+
+  .summary-table th {
+    background: rgba(0,255,136,0.08);
+    color: var(--green);
+    padding: 0.7rem 1rem;
+    text-align: left;
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid var(--border);
+    font-weight: normal;
+  }
+
+  .summary-table td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+  }
+
+  .summary-table tr:last-child td { border-bottom: none; }
+  .summary-table tr:hover td { background: rgba(0,255,136,0.03); }
+
+  /* ── IMG CAPTIONS ── */
+  .img-caption {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 0.4rem;
+    margin-top: 1rem;
+    display: block;
+  }
+
+  .step-body img {
+    width: 100%;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    margin-bottom: 1rem;
+    display: block;
+    cursor: zoom-in;
+    transition: opacity 0.2s, border-color 0.2s;
+  }
+
+  .step-body img:hover { opacity: 0.85; border-color: var(--green); }
+
+
+
+  /* ── DIVIDER ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 3rem 0;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 2rem;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  .footer span { color: var(--green); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── LIGHTBOX ── */
+  .lightbox-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 99999;
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-out;
+    padding: 1.5rem;
+  }
+
+  .lightbox-overlay.active { display: flex; }
+
+  .lightbox-overlay img {
+    max-width: 95vw;
+    max-height: 92vh;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    box-shadow: 0 0 80px rgba(0,0,0,0.8);
+    cursor: zoom-out;
+    object-fit: contain;
+  }
+
+  .lightbox-close {
+    position: fixed;
+    top: 1.2rem; right: 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  .lightbox-close:hover { color: var(--green); }
+
+  .lightbox-hint {
+    position: fixed;
+    bottom: 1.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+  }
+
+  /* ── BACK LINK ── */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: 0.1em;
+    margin-bottom: 2rem;
+    transition: color 0.2s;
+  }
+
+  .back-link::before { content: '←'; color: var(--green); }
+  .back-link:hover { color: var(--green); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .hero-meta { gap: 1.2rem; }
+    .section-number { font-size: 3.5rem; }
+    .section-title { font-size: 1.7rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HERO ── -->
+<header class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-content">
+    <a class="back-link" href="../index.html">Back to Portfolio</a>
+    <div class="badge">TryHackMe — Room Walkthrough</div>
+    <h1 class="hero-title">
+      Summit
+      <span>Room</span>
+    </h1>
+    <p class="hero-subtitle">// Threat Simulation · Detection Engineering · Pyramid of Pain · Sigma Rules</p>
+
+    <p style="font-family:var(--mono);font-size:0.65rem;color:var(--green);letter-spacing:0.2em;text-transform:uppercase;margin-top:2rem;margin-bottom:0.5rem;">// Room Scenario</p>
+    <p style="max-width:680px;font-size:0.95rem;color:var(--muted);line-height:1.8;text-align:left;">
+      After participating in one too many incident response activities, <span style="color:var(--white);">PicoSecure</span> has decided to conduct a threat simulation and detection engineering engagement to bolster its malware detection capabilities. You have been assigned to work with an external penetration tester in an iterative <span style="color:var(--cyan);">purple-team scenario</span>. The tester will be attempting to execute malware samples on a simulated internal user workstation. At the same time, you will need to configure PicoSecure's security tools to detect and prevent the malware from executing.
+    </p>
+    <p style="max-width:680px;font-size:0.95rem;color:var(--muted);line-height:1.8;text-align:left;margin-top:1rem;">
+      Following the <span style="color:var(--green);">Pyramid of Pain's</span> ascending priority of indicators, your objective is to increase the simulated adversaries' cost of operations and chase them away for good. Each level of the pyramid allows you to detect and prevent various indicators of attack.
+    </p>
+
+    <div class="hero-meta">
+      <div class="meta-item">
+        <span class="meta-label">Platform</span>
+        <span class="meta-value">TryHackMe</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Difficulty</span>
+        <span class="meta-value">Easy</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Category</span>
+        <span class="meta-value">Detection Engineering</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Flags Captured</span>
+        <span class="meta-value">06 / 06</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Status</span>
+        <span class="meta-value">✓ Completed</span>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-hint">SCROLL</div>
+</header>
+
+<!-- ── MAIN ── -->
+<main class="main">
+
+  <!-- OVERVIEW TABLE -->
+  <div class="section-header">
+    <div class="section-number">00</div>
+    <div class="section-info">
+      <div class="section-tag">// Overview</div>
+      <div class="section-title">Detection Summary</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th>Sample</th>
+        <th>Detection Method</th>
+        <th>Tool Used</th>
+        <th>ATT&amp;CK / Flag</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>sample1.exe</td>
+        <td>SHA256 Hash Block</td>
+        <td>Hash Manager</td>
+        <td style="color:var(--green);font-family:var(--mono);font-size:0.75rem;">THM{f3cbf08151a11a6a331db9c6cf5f4fe4}</td>
+      </tr>
+      <tr>
+        <td>sample2.exe</td>
+        <td>Egress Firewall Rule</td>
+        <td>Firewall Rule Manager</td>
+        <td style="color:var(--green);font-family:var(--mono);font-size:0.75rem;">THM{2ff48a3421a938b388418be273f4806d}</td>
+      </tr>
+      <tr>
+        <td>sample3.exe</td>
+        <td>DNS Domain Block</td>
+        <td>DNS Filter</td>
+        <td style="color:var(--green);font-family:var(--mono);font-size:0.75rem;">THM{4eca9e2f61a19ecd5df34c788e7dce16}</td>
+      </tr>
+      <tr>
+        <td>sample4.exe</td>
+        <td>Sigma — Registry Modification</td>
+        <td>Sigma Rule Builder</td>
+        <td style="color:var(--green);font-family:var(--mono);font-size:0.75rem;">THM{c956f455fc076aea829799c0876ee399}</td>
+      </tr>
+      <tr>
+        <td>sample5.exe</td>
+        <td>Sigma — Network Beaconing</td>
+        <td>Sigma Rule Builder</td>
+        <td style="color:var(--green);font-family:var(--mono);font-size:0.75rem;">THM{46b21c4410e47dc5729ceadef0fc722e}</td>
+      </tr>
+      <tr>
+        <td>sample6.exe</td>
+        <td>Sigma — File Creation (TTP)</td>
+        <td>Sigma Rule Builder</td>
+        <td style="color:var(--green);font-family:var(--mono);font-size:0.75rem;">THM{c8951b2ad24bbcbac60c16cf2c83d92c}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="divider"></div>
+
+  <!-- SAMPLE 1 -->
+  <div class="section-header">
+    <div class="section-number">01</div>
+    <div class="section-info">
+      <div class="section-tag">// Hash-Based Detection</div>
+      <div class="section-title">Sample 1 — Hash Block</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">SAMPLE 01</div>
+    <div class="step-header">
+      <div class="step-icon">🔍</div>
+      <div class="step-title">Malware Sandbox Analysis &amp; SHA256 Block Rule</div>
+    </div>
+    <div class="step-body">
+      <p>The room opens with an email from <span class="hl-green">SPHINX</span> (<code><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="31424159585f497141545f45544245585f561f45595c">[email&#160;protected]</a></code>) who will work with me to conduct threat simulation and detection engineering tests. They have sent through the first malware sample asking me to scan <code>sample1.exe</code> with the Malware Sandbox tool and to find a unique way to detect and block it. Upon clicking on the attachment I am taken to the malware sandbox tool asking me to submit <code>sample1.exe</code> for analysis. Clicking the submit button starts the scan on a sandboxed <span class="hl-cyan">Windows 10 x64 v1803</span> system and generates a report once finished.</p>
+
+      <p>The report shows the file is tagged as <span class="hl-red">Trojan.Metasploit.A</span> and includes three hash values — MD5 (<code>cbda8ae000aa9cbe7c8b982bae006c2a</code>), SHA1 (<code>83d2791ca93e58688598485aa62597c0ebbf7610</code>), and SHA256 (<code>9c550591a25c6228cb7d74d970d133d75c961ffed2ef7180144859cc09efca8c</code>). The behaviour analysis also flags <span class="hl-red">METASPLOIT was detected</span> under Malicious and <span class="hl-yellow">Connects to unusual port</span> under Suspicious. As MD5 and SHA1 are considered insecure I will use the SHA256 hash value to create a block rule. So I navigate to the Manage Hashes page, select the SHA256 radio box and add the hash value. Upon submitting I get a confirmation saying nice work — I have prevented <code>sample1.exe</code> from being executed. Check the inbox for the next steps.</p>
+
+      <span class="img-caption">// INITIAL EMAIL — SPHINX introduces the penetration test and attaches sample1.exe</span>
+      <img src="images/First_email.PNG" alt="First email from SPHINX introducing the penetration test" />
+
+      <span class="img-caption">// MALWARE SANDBOX — Submitting sample1.exe for analysis</span>
+      <img src="images/Malware_Sandbox_Sample1.PNG" alt="Malware Sandbox submission page for sample1.exe" />
+
+      <span class="img-caption">// SANDBOX RUNNING — Analysis in progress on Windows 10 x64 v1803</span>
+      <img src="images/Malware_Sandbox_Sample1_Scan.PNG" alt="Malware Sandbox scan running for sample1.exe" />
+
+      <span class="img-caption">// SANDBOX REPORT — Trojan.Metasploit.A detected with all three hash values and behaviour analysis</span>
+      <img src="images/Malware_Sandbox_Sample1_Report.PNG" alt="Malware Sandbox report for sample1.exe" />
+
+      <span class="img-caption">// MANAGE HASHES — Entering the SHA256 hash to create a block rule</span>
+      <img src="images/Manage_Hashes_Sample1.PNG" alt="Manage Hashes page with SHA256 hash entered" />
+
+      <span class="img-caption">// BLOCK CONFIRMED — sample1.exe prevented from executing via its SHA256 hash</span>
+      <img src="images/Manage_Hashes_Sample1_Complete.PNG" alt="Manage Hashes showing successful block of sample1.exe" />
+
+      <div class="flag-card">
+        <div class="flag-icon">🚩</div>
+        <div>
+          <div class="flag-label">Flag 1 Captured</div>
+          <div class="flag-value">THM{f3cbf08151a11a6a331db9c6cf5f4fe4}</div>
+        </div>
+      </div>
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the first flag you receive after successfully detecting sample1.exe?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: THM{f3cbf08151a11a6a331db9c6cf5f4fe4}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">File Hash</span>
+      <span class="tag tag-cyan">SHA256</span>
+      <span class="tag tag-red">Trojan.Metasploit.A</span>
+      <span class="tag tag-green">Blocked</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- SAMPLE 2 -->
+  <div class="section-header">
+    <div class="section-number">02</div>
+    <div class="section-info">
+      <div class="section-tag">// Network-Based Detection</div>
+      <div class="section-title">Sample 2 — Firewall Rule</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">SAMPLE 02</div>
+    <div class="step-header">
+      <div class="step-icon">🔥</div>
+      <div class="step-title">C2 IP Block via Egress Firewall Rule</div>
+    </div>
+    <div class="step-body">
+      <p>Going back to the inbox there is a new email from SPHINX titled <span class="hl-white" style="color:var(--white);">"Update: You Blocked Me!"</span> containing the first flag and introducing <code>sample2.exe</code>. SPHINX explains that while file hashes are the <em>highest confidence</em> indicators available, they are also the most susceptible to change — altering a single bit of the file generates a completely new hash, breaking the detection rule. To prove the point, SPHINX simply recompiled the malware and executed it without issue.</p>
+
+      <p>Clicking on the <code>sample2.exe</code> attachment takes me back to the Malware Sandbox. The report still tags it as <span class="hl-red">Trojan.Metasploit.A</span> but with a new file size of <span class="hl-cyan">202.73 KB</span> and entirely different hash values. The behaviour analysis flags <span class="hl-red">METASPLOIT was detected</span> and under Suspicious: <span class="hl-yellow">Connects to unusual IP address</span> and <span class="hl-yellow">Connects to unusual port</span> (PID: 1927). The Network Activity shows 1 HTTP GET request from <code>sample2.exe</code> to <code>154.35.10.113:4444</code> with the full URL <code>http://154.35.10.113:4444/uvLk8YI32</code>, hosted by <span class="hl-cyan">Intrabuzz Hosting Limited</span>. So let's see if we can block this outbound connection with a firewall rule.</p>
+
+      <p>Clicking on the Firewall Rule Manager lets me create a rule. I select <span class="hl-green">Egress</span> for type as we want to block an outbound connection, set Source IP to <span class="hl-green">Any</span> to apply this rule to all IPs in the company, enter the suspicious destination IP of <code>154.35.10.113</code>, and set Action to <span class="hl-red">Deny</span>. Upon clicking Save Rule the active rules table confirms the new egress deny rule is in place.</p>
+
+      <span class="img-caption">// FLAG 1 EMAIL — SPHINX confirms the hash block worked and introduces sample2.exe</span>
+      <img src="images/First_flag_and_second_malware_sample.png" alt="Email from SPHINX with flag 1 and sample2.exe" />
+
+      <span class="img-caption">// MALWARE SANDBOX — Submitting sample2.exe for analysis</span>
+      <img src="images/Malware_Sandbox_Sample2.png" alt="Malware Sandbox submission page for sample2.exe" />
+
+      <span class="img-caption">// SANDBOX RUNNING — Analysis in progress</span>
+      <img src="images/Malware_Sandbox_Sample2_Scan.png" alt="Malware Sandbox scan running for sample2.exe" />
+
+      <span class="img-caption">// SANDBOX REPORT — C2 GET request to 154.35.10.113:4444 visible in network activity</span>
+      <img src="images/Malware_Sandbox_Sample2_Report.png" alt="Malware Sandbox report for sample2.exe" />
+
+      <span class="img-caption">// FIREWALL RULE MANAGER — Existing active rules before creating the block rule</span>
+      <img src="images/Firewall_rule_manager.png" alt="Firewall Rule Manager active rules list" />
+
+      <span class="img-caption">// CREATE RULE — Egress deny rule targeting 154.35.10.113</span>
+      <img src="images/Firewall_rule_manager_create_rule.png" alt="Firewall rule creation form" />
+
+      <span class="img-caption">// RULE CONFIRMED — sample2.exe blocked from reaching its C2 server</span>
+      <img src="images/Firewall_rule_manager_Sample2_complete.png" alt="Firewall Rule Manager showing successful block" />
+
+      <div class="flag-card">
+        <div class="flag-icon">🚩</div>
+        <div>
+          <div class="flag-label">Flag 2 Captured</div>
+          <div class="flag-value">THM{2ff48a3421a938b388418be273f4806d}</div>
+        </div>
+      </div>
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the second flag you receive after successfully detecting sample2.exe?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: THM{2ff48a3421a938b388418be273f4806d}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">Egress Firewall</span>
+      <span class="tag tag-cyan">C2 Detection</span>
+      <span class="tag tag-red">154.35.10.113:4444</span>
+      <span class="tag tag-green">Blocked</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- SAMPLE 3 -->
+  <div class="section-header">
+    <div class="section-number">03</div>
+    <div class="section-info">
+      <div class="section-tag">// DNS-Based Detection</div>
+      <div class="section-title">Sample 3 — DNS Filter</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">SAMPLE 03</div>
+    <div class="step-header">
+      <div class="step-icon">🌐</div>
+      <div class="step-title">C2 Domain Block via DNS Filter Rule</div>
+    </div>
+    <div class="step-body">
+      <p>Going back to the inbox there is a new email from SPHINX titled <span class="hl-white" style="color:var(--white);">"Stumped again... for now!"</span> containing the second flag and introducing <code>sample3.exe</code>. SPHINX acknowledges the IP block worked but points out it isn't bulletproof — they have signed up for a cloud service provider giving access to many more public IPs, with plenty of backups to failover to if they get blocked.</p>
+
+      <p>Clicking on the attachment takes me back to the Malware Sandbox. The report again tags as <span class="hl-red">Trojan.Metasploit.A</span>. The behaviour analysis flags <span class="hl-red">METASPLOIT was detected</span> and <span class="hl-red">Downloads executable files from the Internet</span> under Malicious (including <code>backdoor.exe</code> PID: 2172). Network activity shows 2 HTTP requests and 2 DNS requests. The HTTP requests are GET requests to <code>emudyn.bresonicz.info:1337</code> — one fetching <code>/km2993a</code> and one downloading <code>/backdoor.exe</code>. The Connections table shows <span class="hl-cyan">emudyn.bresonicz.info</span> attributed to <span class="hl-cyan">Xplorita Cloud Services</span> — confirming SPHINX's cloud provider. So going back to the menu I navigate to the DNS Filter.</p>
+
+      <p>Clicking Create a Rule I fill in: Rule Name <span class="hl-green">Block Malware Sample3</span>, Category <span class="hl-yellow">Malware</span>, Domain Name <span class="hl-green">emudyn.bresonicz.info</span>, and Action <span class="hl-red">Deny</span>. Clicking Save Rule adds the new rule to the active rules table and a confirmation message appears.</p>
+
+      <span class="img-caption">// FLAG 2 EMAIL — "Stumped again... for now!" — SPHINX confirms IP block and introduces sample3.exe</span>
+      <img src="images/Second_flag_and_third_malware_sample.png" alt="Email from SPHINX with flag 2 and sample3.exe" />
+
+      <span class="img-caption">// MALWARE SANDBOX — Submitting sample3.exe</span>
+      <img src="images/Malware_Sandbox_Sample3.png" alt="Malware Sandbox submission page for sample3.exe" />
+
+      <span class="img-caption">// SANDBOX RUNNING — Analysis in progress</span>
+      <img src="images/Malware_Sandbox_Sample3_Scan.png" alt="Malware Sandbox scan running for sample3.exe" />
+
+      <span class="img-caption">// SANDBOX REPORT — emudyn.bresonicz.info via Xplorita Cloud Services identified as C2 domain, backdoor.exe download observed</span>
+      <img src="images/Malware_Sandbox_Sample3_Report.png" alt="Malware Sandbox report for sample3.exe" />
+
+      <span class="img-caption">// DNS RULE MANAGER — Existing active rules before creating the block rule</span>
+      <img src="images/DNS_rule_manager.png" alt="DNS Rule Manager active rules list" />
+
+      <span class="img-caption">// CREATE DNS RULE — Malware category deny rule targeting emudyn.bresonicz.info</span>
+      <img src="images/DNS_rule_manager_create_a_rule.png" alt="DNS rule creation form" />
+
+      <span class="img-caption">// RULE CONFIRMED — sample3.exe blocked from reaching its C2 server via DNS</span>
+      <img src="images/DNS_Rule_Manager_Sample3_complete.png" alt="DNS Rule Manager showing successful block" />
+
+      <div class="flag-card">
+        <div class="flag-icon">🚩</div>
+        <div>
+          <div class="flag-label">Flag 3 Captured</div>
+          <div class="flag-value">THM{4eca9e2f61a19ecd5df34c788e7dce16}</div>
+        </div>
+      </div>
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the third flag you receive after successfully detecting sample3.exe?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: THM{4eca9e2f61a19ecd5df34c788e7dce16}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">DNS Filter</span>
+      <span class="tag tag-cyan">emudyn.bresonicz.info</span>
+      <span class="tag tag-red">Xplorita Cloud Services</span>
+      <span class="tag tag-green">Blocked</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- SAMPLE 4 -->
+  <div class="section-header">
+    <div class="section-number">04</div>
+    <div class="section-info">
+      <div class="section-tag">// Sigma Rule — Registry</div>
+      <div class="section-title">Sample 4 — Registry Modification</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">SAMPLE 04</div>
+    <div class="step-header">
+      <div class="step-icon">📝</div>
+      <div class="step-title">Sigma Rule — DisableRealtimeMonitoring Registry Write</div>
+    </div>
+    <div class="step-body">
+      <p>Going back to the inbox there is a new email from SPHINX titled <span class="hl-white" style="color:var(--white);">"RE: Stumped again... for now!"</span> containing the third flag and introducing <code>sample4.exe</code>. SPHINX acknowledges the DNS block worked but explains they now have to purchase and register new domain names. This time SPHINX makes it clear — blocking hashes, IPs, or domains won't help. Instead we need to consider what <span class="hl-green">artefacts (or changes)</span> the malware leaves on the victim's host system.</p>
+
+      <p>The Sandbox report shows the file this time has <span class="hl-red">no tags</span> — SPHINX has stripped the obvious malware signatures. File size is <span class="hl-cyan">219.46 KB</span>. The behaviour analysis flags <span class="hl-red">Disables Windows Defender Real-time monitoring</span> and <span class="hl-red">Downloads executable files from the Internet</span> under Malicious. Under Suspicious: <span class="hl-yellow">Connects to unusual IP address</span>, <span class="hl-yellow">Connects to unusual port</span>, and notably <span class="hl-yellow">Makes changes to the registry</span>. Scrolling to the bottom of the report reveals a <span class="hl-green">Registry Activity</span> section — 3 total events (1 read, 2 write). The key modification event shows <code>sample4.exe</code> (PID: 3806) performing a write to <code>HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Defender\Real-Time Protection</code> with Name <code>DisableRealtimeMonitoring</code> and Value <code>1</code>.</p>
+
+      <p>Since blocking hashes, IPs, or domains won't work I use the <span class="hl-green">Sigma Rule Builder</span>. At Step 1 I select <span class="hl-cyan">Sysmon Event Logs</span>. At Step 2 I select <span class="hl-cyan">Registry Modifications</span>. Step 3 asks for the rule conditions:</p>
+
+      <div class="code-block" data-label="SIGMA RULE INPUT — REGISTRY">
+        <code><span class="comment">// Step 3: Registry Modifications</span>
+<span class="keyword">Registry Key:</span>  <span class="value">HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Defender\Real-Time Protection</span>
+<span class="keyword">Registry Name:</span> <span class="value">DisableRealtimeMonitoring</span>
+<span class="keyword">Value:</span>         <span class="value">1</span>
+<span class="keyword">ATT&CK ID:</span>    <span class="value">Defense Evasion (TA0005)</span></code>
+      </div>
+
+      <p>Clicking Validate Rule generates the Sigma rule titled <span class="hl-green">"Modification of Windows Defender Real-Time Protection"</span> (ID: <code>windows_registry_defender_disable_realtime</code>), using EventID 4663, mapped to <code>attack.ta0005</code>, rated <span class="hl-red">high</span> severity.</p>
+
+      <span class="img-caption">// FLAG 3 EMAIL — "RE: Stumped again... for now!" — SPHINX warns that hashes, IPs and domains won't work, introduces sample4.exe</span>
+      <img src="images/thrid_flag_and_fourth_malware_sample.png" alt="Email from SPHINX with flag 3 and sample4.exe" />
+
+      <span class="img-caption">// MALWARE SANDBOX — Submitting sample4.exe</span>
+      <img src="images/Malware_Sandbox_Sample4.png" alt="Malware Sandbox submission page for sample4.exe" />
+
+      <span class="img-caption">// SANDBOX RUNNING — Analysis in progress</span>
+      <img src="images/Malware_Sandbox_Sample4_Scan.png" alt="Malware Sandbox scan running for sample4.exe" />
+
+      <span class="img-caption">// SANDBOX REPORT — No tags, but registry activity reveals DisableRealtimeMonitoring write event</span>
+      <img src="images/Malware_Sandbox_Sample4_Report.png" alt="Malware Sandbox report for sample4.exe" />
+
+      <span class="img-caption">// SIGMA RULE BUILDER — Powered by Sigma GPT, auto-deploys to PicoSecure's SIEM</span>
+      <img src="images/Sigma_Rule_Builder.png" alt="Sigma Rule Builder main page" />
+
+      <span class="img-caption">// STEP 2 — Selecting Registry Modifications as the target Sysmon event type</span>
+      <img src="images/Sigma_Rule_Builder_create_rule_options_step_2.png" alt="Sigma Rule Builder Step 2" />
+
+      <span class="img-caption">// STEP 3 — Empty Registry Modifications form</span>
+      <img src="images/Sigma_Rule_Builder_create_rule_options_step_3.png" alt="Sigma Rule Builder Step 3 empty" />
+
+      <span class="img-caption">// STEP 3 COMPLETED — Registry key, name, value and ATT&CK ID filled in</span>
+      <img src="images/Sigma_Rule_Builder_create_rule_options_step_3_complete.png" alt="Sigma Rule Builder Step 3 completed" />
+
+      <span class="img-caption">// SIGMA VALIDATION — Rule generated: EventID 4663, TA0005 Defence Evasion, high severity</span>
+      <img src="images/Sigma_Rule_Builder_validation.png" alt="Sigma Rule Validation for registry modification detection" />
+
+      <div class="flag-card">
+        <div class="flag-icon">🚩</div>
+        <div>
+          <div class="flag-label">Flag 4 Captured</div>
+          <div class="flag-value">THM{c956f455fc076aea829799c0876ee399}</div>
+        </div>
+      </div>
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the fourth flag you receive after successfully detecting sample4.exe?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: THM{c956f455fc076aea829799c0876ee399}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">Sigma Rule</span>
+      <span class="tag tag-cyan">Sysmon EventID 4663</span>
+      <span class="tag tag-red">TA0005 — Defence Evasion</span>
+      <span class="tag tag-green">High Severity</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- SAMPLE 5 -->
+  <div class="section-header">
+    <div class="section-number">05</div>
+    <div class="section-info">
+      <div class="section-tag">// Sigma Rule — Beaconing</div>
+      <div class="section-title">Sample 5 — Network Connections</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">SAMPLE 05</div>
+    <div class="step-header">
+      <div class="step-icon">📡</div>
+      <div class="step-title">Sigma Rule — Beaconing Pattern Detection</div>
+    </div>
+    <div class="step-body">
+      <p>Going back to the inbox there is a new email from SPHINX titled <span class="hl-white" style="color:var(--white);">"New Approach"</span> — signed off as <em>"Annoyed Sphinx"</em> — containing the fourth flag and introducing <code>sample5.exe</code>. SPHINX admits the registry detection threw a serious wrench into their operation. For this new sample all of the "heavy lifting" occurs on the back-end server, meaning protocols and host artefacts can be changed at will. To help, SPHINX attaches the <span class="hl-cyan">outgoing_connections.log</span> from the last 12 hours of network connections on the victim machine.</p>
+
+      <p>Opening the log in the Attachment Viewer reveals a clear <span class="hl-green">beaconing pattern</span> — one destination IP of <code>51.102.10.19</code> on port <code>443</code> appears repeatedly with a consistent packet size of exactly <span class="hl-yellow">97 bytes</span>, occurring every <span class="hl-yellow">30 minutes</span>. The other entries to different IPs and varying byte sizes are noise — normal traffic.</p>
+
+      <p>Going back to the Sigma Rule Builder and clicking Create Sigma Rule, I again select <span class="hl-cyan">Sysmon Event Logs</span> at Step 1. At Step 2 I select <span class="hl-cyan">Network Connections</span>. At Step 3, because SPHINX can rotate IPs and ports, I set both Remote IP and Remote Port to <span class="hl-green">Any</span> and rely on the consistent beacon signature instead:</p>
+
+      <div class="code-block" data-label="SIGMA RULE INPUT — NETWORK">
+        <code><span class="comment">// Step 3: Network Connections</span>
+<span class="keyword">Remote IP:</span>          <span class="value">Any</span>
+<span class="keyword">Remote Port:</span>        <span class="value">Any</span>
+<span class="keyword">Size (bytes):</span>       <span class="value">97</span>
+<span class="keyword">Frequency (seconds):</span><span class="value">1800</span>
+<span class="keyword">ATT&CK ID:</span>          <span class="value">Command and Control (TA0011)</span></code>
+      </div>
+
+      <p>Clicking Validate Rule generates the Sigma rule titled <span class="hl-green">"Alert on Suspicious Beacon Network Connections"</span> (ID: <code>network_connections_criteria_sysmon</code>), using EventID 3, wildcarded RemoteIP and RemotePort, mapped to <code>attack.ta0011</code>, rated <span class="hl-red">high</span> severity.</p>
+
+      <span class="img-caption">// FLAG 4 EMAIL — "New Approach" signed "Annoyed Sphinx" — confirms registry detection worked, attaches outgoing_connections.log</span>
+      <img src="images/Fouth_flag_and_fifth_malware_sample.png" alt="Email from SPHINX with flag 4 and outgoing_connections.log" />
+
+      <span class="img-caption">// OUTGOING CONNECTIONS LOG — Beaconing to 51.102.10.19 at 97 bytes every 30 minutes clearly visible among normal traffic noise</span>
+      <img src="images/Outgoing_connections_log.png" alt="Outgoing connections log showing beaconing pattern" />
+
+      <span class="img-caption">// SIGMA RULE BUILDER — Returning to build a new rule for sample5.exe</span>
+      <img src="images/Sigma_Rule_Builder.png" alt="Sigma Rule Builder main page" />
+
+      <span class="img-caption">// STEP 3 — Empty Network Connections form showing required fields</span>
+      <img src="images/Sigma_rule_builder_network_connections.png" alt="Sigma Rule Builder Step 3 empty Network Connections form" />
+
+      <span class="img-caption">// STEP 3 COMPLETED — Any/Any for IP and port, 97 bytes, 1800 second frequency, TA0011</span>
+      <img src="images/Sigma_rule_builder_network_connections_step_3.png" alt="Sigma Rule Builder Step 3 completed with beaconing values" />
+
+      <span class="img-caption">// SIGMA VALIDATION — "Alert on Suspicious Beacon Network Connections", EventID 3, high severity, TA0011</span>
+      <img src="images/Sigma_rule_builder_network_connections_sigma_rule_validation.png" alt="Sigma Rule Validation for beaconing detection" />
+
+      <div class="flag-card">
+        <div class="flag-icon">🚩</div>
+        <div>
+          <div class="flag-label">Flag 5 Captured</div>
+          <div class="flag-value">THM{46b21c4410e47dc5729ceadef0fc722e}</div>
+        </div>
+      </div>
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the fifth flag you receive after successfully detecting sample5.exe?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: THM{46b21c4410e47dc5729ceadef0fc722e}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">Sigma Rule</span>
+      <span class="tag tag-cyan">Sysmon EventID 3</span>
+      <span class="tag tag-red">TA0011 — Command &amp; Control</span>
+      <span class="tag tag-green">Beaconing Pattern</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- SAMPLE 6 -->
+  <div class="section-header">
+    <div class="section-number">06</div>
+    <div class="section-info">
+      <div class="section-tag">// Sigma Rule — TTP Detection</div>
+      <div class="section-title">Sample 6 — File Creation / Exfiltration</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-number">SAMPLE 06</div>
+    <div class="step-header">
+      <div class="step-icon">📂</div>
+      <div class="step-title">Sigma Rule — Exfiltration Staging File Detection</div>
+    </div>
+    <div class="step-body">
+      <p>Going back to the inbox there is a new email from SPHINX titled <span class="hl-white" style="color:var(--white);">"RE: New Approach"</span> — now signed as <em>"Very Annoyed Sphinx! 😤"</em> — containing the fifth flag and introducing <code>sample6.exe</code>. SPHINX admits the beaconing detection was impressive. They can keep this up one or two more times, but the reward no longer outweighs the cost and they would rather find an easier target lower on the pyramid. For this final sample, artefacts and tool detection won't be enough — we need to focus on something extremely hard to change subconsciously: their <span class="hl-green">techniques and procedures</span>. SPHINX attaches the <span class="hl-cyan">commands.log</span> recorded from all previous samples.</p>
+
+      <p>Opening the <code>commands.log</code> shows every command SPHINX runs on compromised machines — all output is piped to the same staging file <span class="hl-red">%temp%\exfiltr8.log</span>:</p>
+
+      <div class="code-block" data-label="COMMANDS.LOG — EXFILTRATION TTP">
+        <code><span class="value">dir c:\ >> %temp%\exfiltr8.log</span>
+<span class="value">dir "c:\Documents and Settings" >> %temp%\exfiltr8.log</span>
+<span class="value">dir "c:\Program Files\" >> %temp%\exfiltr8.log</span>
+<span class="value">dir d:\ >> %temp%\exfiltr8.log</span>
+<span class="value">net localgroup administrator >> %temp%\exfiltr8.log</span>
+<span class="value">ver >> %temp%\exfiltr8.log</span>
+<span class="value">systeminfo >> %temp%\exfiltr8.log</span>
+<span class="value">ipconfig /all >> %temp%\exfiltr8.log</span>
+<span class="value">netstat -ano >> %temp%\exfiltr8.log</span>
+<span class="value">net start >> %temp%\exfiltr8.log</span></code>
+      </div>
+
+      <p>The pattern is clear — SPHINX enumerates directory listings, local admin accounts, OS version, system info, network config, active connections, and running services, all piped into <code>exfiltr8.log</code> in the temp folder. This is a consistent TTP that won't change regardless of IP, domain, hash, or protocol used. So going back to the Sigma Rule Builder, I select <span class="hl-cyan">Sysmon Event Logs</span> at Step 1, then <span class="hl-cyan">File Creation and Modification</span> at Step 2. Step 3 conditions:</p>
+
+      <div class="code-block" data-label="SIGMA RULE INPUT — FILE CREATION">
+        <code><span class="comment">// Step 3: File Creation and Modification</span>
+<span class="keyword">File Path:</span>  <span class="value">%temp%</span>
+<span class="keyword">File Name:</span>  <span class="value">exfiltr8.log</span>
+<span class="keyword">ATT&CK ID:</span> <span class="value">Exfiltration (TA0010)</span></code>
+      </div>
+
+      <p>Clicking Validate Rule generates the final Sigma rule titled <span class="hl-green">"Alert on Potential Exfiltration through File Creation or Modification"</span> (ID: <code>sysmon_file_creation_modification_temp</code>), using EventID 2, tagged with <code>attack.ta0010</code>, <code>attack.exfiltration</code>, <code>attack.file_creation</code>, and <code>attack.file_modification</code>, rated <span class="hl-red">high</span> severity. The rule is automatically deployed to PicoSecure's SIEM. Room complete!</p>
+
+      <span class="img-caption">// FLAG 5 EMAIL — "RE: New Approach" signed "Very Annoyed Sphinx!" — confirms beaconing detection, attaches commands.log</span>
+      <img src="images/Fith_flag_and_sixth_malware_sample.png" alt="Email from SPHINX with flag 5 and commands.log" />
+
+      <span class="img-caption">// COMMANDS.LOG — All 10 enumeration commands consistently output to %temp%\exfiltr8.log</span>
+      <img src="images/Sample_6_commands_log.png" alt="commands.log showing exfiltration commands" />
+
+      <span class="img-caption">// SIGMA RULE BUILDER — Returning for the final rule of the room</span>
+      <img src="images/Sigma_Rule_Builder.png" alt="Sigma Rule Builder main page" />
+
+      <span class="img-caption">// STEP 2 — Selecting File Creation and Modification as the target Sysmon event type</span>
+      <img src="images/Sigma_rule_builder_file_creation.png" alt="Sigma Rule Builder Step 2 File Creation selected" />
+
+      <span class="img-caption">// STEP 3 — Empty File Creation form</span>
+      <img src="images/Sigma_rule_builder_file_creation_step_3.png" alt="Sigma Rule Builder Step 3 empty" />
+
+      <span class="img-caption">// STEP 3 COMPLETED — %temp%, exfiltr8.log, Exfiltration (TA0010)</span>
+      <img src="images/Sigma_rule_builder_file_creation_step_3.png" alt="Sigma Rule Builder Step 3 completed" />
+
+      <span class="img-caption">// SIGMA VALIDATION — "Alert on Potential Exfiltration through File Creation or Modification", EventID 2, four ATT&CK tags, high severity. Room complete!</span>
+      <img src="images/Sigma_rule_builder_file_creation_sigma_rule_validation.png" alt="Sigma Rule Validation for exfiltration detection — room complete" />
+
+      <div class="flag-card">
+        <div class="flag-icon">🚩</div>
+        <div>
+          <div class="flag-label">Flag 6 Captured — Room Complete</div>
+          <div class="flag-value">THM{c8951b2ad24bbcbac60c16cf2c83d92c}</div>
+        </div>
+      </div>
+
+      <div style="background:#080b0f;border:1px solid var(--border);border-radius:2px;padding:1.2rem 1.5rem;margin:1rem 0;">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.8rem;">// ROOM QUESTIONS</div>
+        <div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--text);">Q: What is the final flag you receive from Sphinx?</div>
+          <div style="font-family:var(--mono);font-size:0.8rem;color:var(--green);margin-top:0.2rem;">A: THM{c8951b2ad24bbcbac60c16cf2c83d92c}</div>
+        </div>
+      </div>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">Sigma Rule</span>
+      <span class="tag tag-cyan">Sysmon EventID 2</span>
+      <span class="tag tag-red">TA0010 — Exfiltration</span>
+      <span class="tag tag-green">TTP Detection</span>
+      <span class="tag tag-green">Room Complete</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="divider"></div>
+
+  <!-- KEY TAKEAWAYS -->
+  <div class="section-header">
+    <div class="section-number">07</div>
+    <div class="section-info">
+      <div class="section-tag">// Reflection</div>
+      <div class="section-title">Key Takeaways</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">🔑</div>
+      <div class="step-title">Hash-Based Detection is High Confidence but Low Durability</div>
+    </div>
+    <div class="step-body">
+      <p>File hashes like <span class="hl-cyan">SHA256</span> are the most precise indicators available — a matching hash guarantees you are looking at the exact same file. However, they sit at the very bottom of the <span class="hl-green">Pyramid of Pain</span> for a reason: a single recompile, even changing one byte, generates an entirely new hash and bypasses the detection rule instantly. Hash-based blocking is a useful first layer but should never be relied on as a primary detection strategy. It is best used in combination with higher-confidence behavioural indicators.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">Pyramid of Pain</span>
+      <span class="tag tag-cyan">Hash Values</span>
+      <span class="tag tag-red">Low Durability</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">🔥</div>
+      <div class="step-title">IP Blocking is Easily Rotated — Especially with Cloud Infrastructure</div>
+    </div>
+    <div class="step-body">
+      <p>Blocking a specific IP address is one step above hashing on the Pyramid of Pain, but it remains trivial for a motivated attacker to circumvent. Cloud providers like the fictional <span class="hl-cyan">Intrabuzz Hosting Limited</span> offer large pools of public IPs that can be spun up and rotated at low cost. Egress firewall rules blocking specific IPs are still worth implementing as a quick win, but defenders need to plan for the rule being bypassed within hours. The focus should shift toward detecting the <span class="hl-green">behaviour</span> behind the connection, not just the destination address.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">Pyramid of Pain</span>
+      <span class="tag tag-cyan">IP Addresses</span>
+      <span class="tag tag-red">Easily Rotated</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">🌐</div>
+      <div class="step-title">Domain Blocking is More Durable but Still Defeatable</div>
+    </div>
+    <div class="step-body">
+      <p>Domains sit higher on the Pyramid of Pain than IP addresses — registering a new domain, setting up DNS records, and standing up infrastructure takes more time and money than switching an IP. However, as SPHINX demonstrated with <span class="hl-cyan">emudyn.bresonicz.info</span>, it is still a manageable cost for a well-resourced attacker. DNS filtering is a valuable control and blocks the majority of commodity malware which rarely rotates domains. It becomes insufficient against determined, targeted actors. The real value of DNS filtering is the <span class="hl-green">detection signal</span> it generates — a blocked query is an alert worth investigating even if it does not stop the attack entirely.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">Pyramid of Pain</span>
+      <span class="tag tag-cyan">Domain Names</span>
+      <span class="tag tag-green">Detection Signal</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">📝</div>
+      <div class="step-title">Behavioural Artefacts — Registry Modifications are Hard to Hide</div>
+    </div>
+    <div class="step-body">
+      <p>When <code>sample4.exe</code> disabled Windows Defender by writing <span class="hl-red">DisableRealtimeMonitoring = 1</span> to the registry, it left a system-level artefact that is independent of its hash, network destination, or domain. This is a <span class="hl-green">host-based behavioural indicator</span> — it cannot be changed by recompiling the binary or rotating infrastructure. Detecting this with a Sigma rule mapped to <span class="hl-yellow">TA0005 Defence Evasion</span> means the detection survives even if the malware is completely retooled, as long as the attacker still needs to disable AV. This is the power of climbing the Pyramid — the higher you detect, the more costly evasion becomes for the attacker.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">TA0005 — Defence Evasion</span>
+      <span class="tag tag-cyan">Registry Artefacts</span>
+      <span class="tag tag-green">Host-Based Detection</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">📡</div>
+      <div class="step-title">Beaconing Patterns Reveal C2 Even When Infrastructure Rotates</div>
+    </div>
+    <div class="step-body">
+      <p>By moving all C2 logic server-side, SPHINX could rotate IPs, ports, and protocols at will — making individual network indicators useless. However, the <span class="hl-green">beaconing behaviour itself</span> remained constant: same packet size (97 bytes), same interval (every 30 minutes). This is because consistent, predictable C2 communication is a fundamental requirement of maintaining reliable access to a victim machine. An attacker cannot easily change their beacon interval or packet size without risking losing the C2 channel. Detecting this pattern with a Sigma rule targeting <span class="hl-yellow">TA0011 Command and Control</span> is significantly more durable than any network IOC — and demonstrates why <span class="hl-cyan">traffic analysis</span> is a critical skill in detection engineering.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">TA0011 — Command &amp; Control</span>
+      <span class="tag tag-cyan">Traffic Analysis</span>
+      <span class="tag tag-green">Beaconing Detection</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">🏔️</div>
+      <div class="step-title">TTPs are the Summit of the Pyramid — the Hardest to Change</div>
+    </div>
+    <div class="step-body">
+      <p>The final detection targeted SPHINX's <span class="hl-green">post-exploitation procedure</span> — the specific commands they run after gaining access. Every sample used the same pattern: enumerate directories, users, system info, network state, and running services, all piped into <code>%temp%\exfiltr8.log</code>. This is a <span class="hl-yellow">TTP (Tactic, Technique, and Procedure)</span> — it reflects how an attacker <em>thinks and operates</em>, not just what tools they use. As SPHINX admitted, changing a TTP requires retraining, new tooling, and significant investment. Detecting at the TTP level with a Sigma rule mapped to <span class="hl-yellow">TA0010 Exfiltration</span> means an attacker would need to fundamentally change their methodology to evade detection — the costliest response of all, and the true goal of climbing the <span class="hl-green">Pyramid of Pain</span>.</p>
+    </div>
+    <div class="tags">
+      <span class="tag tag-yellow">TA0010 — Exfiltration</span>
+      <span class="tag tag-red">TTPs</span>
+      <span class="tag tag-green">Pyramid of Pain — Summit</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ALL FLAGS REFERENCE -->
+  <div class="section-header">
+    <div class="section-number">08</div>
+    <div class="section-info">
+      <div class="section-tag">// Verified</div>
+      <div class="section-title">All Flags Captured</div>
+    </div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-header">
+      <div class="step-icon">✅</div>
+      <div class="step-title">TryHackMe — All Answers Confirmed Correct</div>
+    </div>
+    <div class="step-body">
+      <img src="images/Summit_Q_A.png" alt="All 6 flags verified correct on TryHackMe" />
+    </div>
+    <div class="tags">
+      <span class="tag tag-green">6 / 6 Flags</span>
+      <span class="tag tag-green">Room Complete</span>
+    </div>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <span>TryHackMe</span> · Summit Room · CTF Walkthrough &nbsp;|&nbsp; <span>James White</span> · E-Portfolio Write-Up
+</footer>
+
+<!-- ── LIGHTBOX ── -->
+<div class="lightbox-overlay" id="lightbox">
+  <div class="lightbox-close" id="lightbox-close">[ ESC / CLICK TO CLOSE ]</div>
+  <img id="lightbox-img" src="" alt="">
+  <div class="lightbox-hint">// CLICK ANYWHERE TO CLOSE</div>
+</div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+  window.addEventListener('DOMContentLoaded', function() {
+    var overlay = document.getElementById('lightbox');
+    var lbImg   = document.getElementById('lightbox-img');
+
+    document.querySelectorAll('.step-body img').forEach(function(img) {
+      img.addEventListener('click', function() {
+        lbImg.src = img.src;
+        lbImg.alt = img.alt;
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      });
+    });
+
+    function closeLightbox() {
+      overlay.classList.remove('active');
+      lbImg.src = '';
+      document.body.style.overflow = '';
+    }
+
+    overlay.addEventListener('click', closeLightbox);
+    document.getElementById('lightbox-close').addEventL
